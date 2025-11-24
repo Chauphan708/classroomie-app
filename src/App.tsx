@@ -5,7 +5,7 @@ import { TeacherView } from './components/TeacherView';
 import { useClassroomStore } from './services/store';
 import { UserRole, UserSession } from './types';
 
-// Simple UUID generator for demo purposes
+// Hàm tạo ID ngẫu nhiên
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
 export default function App() {
@@ -17,12 +17,21 @@ export default function App() {
     const newSession = { id, name, role };
     setSession(newSession);
     
-    if (role === UserRole.STUDENT && group) {
-      store.joinClass(name, group, id);
-    }
+    // --- ĐÂY LÀ ĐOẠN QUAN TRỌNG ĐÃ SỬA ---
+    // Thay vì dùng store.joinClass (lệnh cũ), ta dùng store.connectToRoom (lệnh mới)
+    store.connectToRoom({ 
+      id, 
+      name, 
+      role, 
+      group: role === UserRole.STUDENT ? group : undefined 
+    });
   };
 
   const handleLogout = () => {
+    // Ngắt kết nối khi đăng xuất
+    if (store.channel) {
+        store.channel.unsubscribe();
+    }
     setSession(null);
   };
 
