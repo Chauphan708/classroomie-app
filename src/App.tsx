@@ -17,8 +17,7 @@ export default function App() {
     const newSession = { id, name, role };
     setSession(newSession);
     
-    // --- ĐÂY LÀ ĐOẠN QUAN TRỌNG ĐÃ SỬA ---
-    // Thay vì dùng store.joinClass (lệnh cũ), ta dùng store.connectToRoom (lệnh mới)
+    // --- ĐÂY LÀ LỆNH MỚI (CONNECT), KHÔNG PHẢI JOINCLASS ---
     store.connectToRoom({ 
       id, 
       name, 
