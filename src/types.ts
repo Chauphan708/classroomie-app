@@ -1,20 +1,17 @@
 export enum UserRole {
-  TEACHER = 'TEACHER',
-  STUDENT = 'STUDENT',
+  STUDENT = 'student',
+  TEACHER = 'teacher',
 }
 
-export interface StudentStatus {
+export interface UserSession {
   id: string;
   name: string;
-  group: string; // Added group field (Tổ)
-  needsHelp: boolean;
-  needsHelpAt?: number;
-  isFinished: boolean;
-  isFinishedAt?: number;
-  handRaised: boolean;
-  handRaisedAt?: number;
-  buzzerPressedAt?: number;
-  avatarSeed: number;
+  role: UserRole;
+}
+
+export interface WallConfig {
+  isPublic: boolean;
+  showNames: boolean;
 }
 
 export interface ChatMessage {
@@ -24,12 +21,20 @@ export interface ChatMessage {
   text?: string;
   imageUrl?: string;
   timestamp: number;
-  type: 'text' | 'image' | 'system'; // 'system' for status updates logs
 }
 
-export interface WallConfig {
-  isPublic: boolean; // false: Teacher only, true: All students see
-  showNames: boolean; // false: Anonymous to other students
+export interface StudentStatus {
+  id: string;
+  name: string;
+  group?: string;
+  avatarSeed: string;
+  needsHelp: boolean;
+  needsHelpAt?: number;
+  isFinished: boolean;
+  isFinishedAt?: number;
+  handRaised: boolean;
+  handRaisedAt?: number;
+  buzzerPressedAt?: number;
 }
 
 export interface ClassroomState {
@@ -38,10 +43,4 @@ export interface ClassroomState {
   buzzerActive: boolean;
   buzzerWinnerId: string | null;
   wallConfig: WallConfig;
-}
-
-export interface UserSession {
-  id: string;
-  name: string;
-  role: UserRole;
 }
