@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { UserSession, StudentStatus, ClassroomState } from '../types';
-import { Hand, CheckCircle, AlertCircle, Bell, Send, Image as ImageIcon, X, LogOut, Lock, Users, EyeOff } from 'lucide-react';
+import { Hand, CheckCircle, AlertCircle, Bell, Send, Image as ImageIcon, X, LogOut, Lock, EyeOff } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface Props {
@@ -17,26 +17,26 @@ export const StudentView: React.FC<Props> = ({ session, store, onLogout }) => {
   const { state, updateStudentStatus, sendMessage } = store;
   const myStatus = state.students[session.id];
   const { wallConfig, messages } = state;
-  const [buzzerPressed, setBuzzerPressed] = useState(false);
   
-  // Chat state
+  // 1. KHAI BÁO TẤT CẢ HOOKS Ở ĐÂY (TRƯỚC KHI RETURN)
+  const [buzzerPressed, setBuzzerPressed] = useState(false);
   const [messageText, setMessageText] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  if (!myStatus) {
-     return <div className="flex items-center justify-center h-screen text-gray-500">Đang kết nối...</div>;
-  }
 
   const isBuzzerWinner = state.buzzerWinnerId === session.id;
   const isBuzzerLocked = !state.buzzerActive || (state.buzzerWinnerId !== null && !isBuzzerWinner);
 
+  // useEffect 1: Xử lý pháo giấy
   useEffect(() => {
     if (state.buzzerWinnerId === null) {
       setBuzzerPressed(false);
     } else if (isBuzzerWinner) {
-       confetti({
+       // Dùng bản confetti mặc định để tránh lỗi
+       const fire = (confetti as any).default || confetti;
+       fire({
          particleCount: 100,
          spread: 70,
          origin: { y: 0.6 }
@@ -44,10 +44,22 @@ export const StudentView: React.FC<Props> = ({ session, store, onLogout }) => {
     }
   }, [state.buzzerWinnerId, isBuzzerWinner]);
 
+  // useEffect 2: Cuộn chat xuống cuối
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length, wallConfig.isPublic]);
 
+  // 2. SAU KHI KHAI BÁO HẾT HOOKS, MỚI ĐƯỢC CHECK ĐIỀU KIỆN RETURN
+  if (!myStatus) {
+     return (
+       <div className="flex flex-col items-center justify-center h-screen bg-gray-50 text-gray-500 gap-3">
+          <div className="w-6 h-6 border-2 border-brand-blue border-t-transparent rounded-full animate-spin"></div>
+          <p>Đang kết nối vào lớp...</p>
+       </div>
+     );
+  }
+
+  // --- Logic xử lý sự kiện ---
   const toggleStatus = (key: keyof StudentStatus) => {
     // @ts-ignore
     updateStudentStatus(session.id, { [key]: !myStatus[key] });
@@ -65,7 +77,6 @@ export const StudentView: React.FC<Props> = ({ session, store, onLogout }) => {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        // Simple resizing via canvas to avoid huge strings in localStorage
         const img = new Image();
         img.src = reader.result as string;
         img.onload = () => {
@@ -92,10 +103,9 @@ export const StudentView: React.FC<Props> = ({ session, store, onLogout }) => {
     }
   };
 
-  // Filter messages based on Wall Config
   const visibleMessages = messages.filter(msg => {
     if (wallConfig.isPublic) return true;
-    return msg.senderId === session.id; // Private mode: only see own messages
+    return msg.senderId === session.id;
   });
 
   return (
