@@ -17,12 +17,21 @@ export default function App() {
     const newSession = { id, name, role };
     setSession(newSession);
     
-    if (role === UserRole.STUDENT && group) {
-      store.joinClass(name, group, id);
-    }
+    // --- SỬA ĐỔI QUAN TRỌNG TẠI ĐÂY ---
+    // Gọi hàm kết nối cho CẢ Giáo viên và Học sinh
+    store.connectToRoom({ 
+      id, 
+      name, 
+      role, 
+      group: role === UserRole.STUDENT ? group : undefined 
+    });
   };
 
   const handleLogout = () => {
+    // Ngắt kết nối khi đăng xuất (tùy chọn, để sạch kết nối)
+    if (store.channel) {
+        store.channel.unsubscribe();
+    }
     setSession(null);
   };
 
