@@ -17,8 +17,8 @@ export default function App() {
     const newSession = { id, name, role };
     setSession(newSession);
     
-    // --- SỬA ĐỔI QUAN TRỌNG TẠI ĐÂY ---
-    // Gọi hàm kết nối cho CẢ Giáo viên và Học sinh
+    // --- ĐÂY LÀ PHẦN QUAN TRỌNG ĐÃ ĐƯỢC SỬA ---
+    // Thay vì dùng store.joinClass (cũ), ta dùng store.connectToRoom (mới)
     store.connectToRoom({ 
       id, 
       name, 
@@ -28,7 +28,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    // Ngắt kết nối khi đăng xuất (tùy chọn, để sạch kết nối)
+    // Ngắt kết nối khi đăng xuất để tránh lỗi danh sách ảo
     if (store.channel) {
         store.channel.unsubscribe();
     }
