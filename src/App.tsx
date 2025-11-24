@@ -17,7 +17,7 @@ export default function App() {
     const newSession = { id, name, role };
     setSession(newSession);
     
-    // --- ĐÂY LÀ LỆNH MỚI (CONNECT), KHÔNG PHẢI JOINCLASS ---
+    // SỬA LẠI DÒNG NÀY: Dùng connectToRoom thay vì joinClass
     store.connectToRoom({ 
       id, 
       name, 
@@ -27,7 +27,6 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    // Ngắt kết nối khi đăng xuất
     if (store.channel) {
         store.channel.unsubscribe();
     }
