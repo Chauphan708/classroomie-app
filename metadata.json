@@ -1,0 +1,5 @@
+{
+  "name": "ClassRoomie",
+  "description": "An interactive classroom management tool connecting teachers and students. Features real-time status updates (Need Help, Finished, Raise Hand), a buzzer system, and an AI teaching assistant powered by Gemini.",
+  "requestFramePermissions": []
+}
