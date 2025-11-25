@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { UserSession, StudentStatus, ClassroomState } from '../types';
-import { Hand, CheckCircle, AlertCircle, Bell, Send, Image as ImageIcon, X, LogOut, Lock, EyeOff } from 'lucide-react';
+import { Hand, CheckCircle, AlertCircle, Bell, Send, Image as ImageIcon, X, LogOut, EyeOff, Lock } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface Props {
@@ -18,6 +18,7 @@ export const StudentView: React.FC<Props> = ({ session, store, onLogout }) => {
   const myStatus = state.students[session.id];
   const { wallConfig, messages } = state;
   
+  // 1. KHAI BÁO HOOKS (Luôn để trên cùng)
   const [buzzerPressed, setBuzzerPressed] = useState(false);
   const [messageText, setMessageText] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -26,21 +27,26 @@ export const StudentView: React.FC<Props> = ({ session, store, onLogout }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const isBuzzerWinner = state.buzzerWinnerId === session.id;
+  
+  // Logic khóa: Khóa khi (GV chưa mở) HOẶC (Đã có người thắng khác mình)
   const isBuzzerLocked = !state.buzzerActive || (state.buzzerWinnerId !== null && !isBuzzerWinner);
 
+  // Effect 1: Pháo giấy khi thắng
   useEffect(() => {
     if (state.buzzerWinnerId === null) {
-      setBuzzerPressed(false);
+      setBuzzerPressed(false); // Reset trạng thái nút khi GV reset vòng mới
     } else if (isBuzzerWinner) {
        const fire = (confetti as any).default || confetti;
        fire({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
     }
   }, [state.buzzerWinnerId, isBuzzerWinner]);
 
+  // Effect 2: Cuộn chat xuống cuối
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length, wallConfig.isPublic]);
 
+  // 2. CHECK DỮ LIỆU (Sau khi khai báo Hooks)
   if (!myStatus) {
      return (
        <div className="flex flex-col items-center justify-center h-screen bg-slate-50 text-slate-500 gap-4">
@@ -50,6 +56,7 @@ export const StudentView: React.FC<Props> = ({ session, store, onLogout }) => {
      );
   }
 
+  // 3. CÁC HÀM XỬ LÝ SỰ KIỆN
   const toggleStatus = (key: keyof StudentStatus) => {
     // @ts-ignore
     updateStudentStatus(session.id, { [key]: !myStatus[key] });
@@ -98,6 +105,7 @@ export const StudentView: React.FC<Props> = ({ session, store, onLogout }) => {
     return msg.senderId === session.id;
   });
 
+  // 4. GIAO DIỆN
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans">
       {/* Header */}
@@ -123,27 +131,34 @@ export const StudentView: React.FC<Props> = ({ session, store, onLogout }) => {
       {/* Main Actions */}
       <main className="flex-1 p-4 max-w-md mx-auto w-full space-y-4 pb-6">
         
-        {/* Buzzer Section */}
+        {/* KHU VỰC CHUÔNG (Logic màu sắc mới) */}
         <div className={`p-1 rounded-[2.5rem] bg-white shadow-xl transition-all duration-300 ${isBuzzerWinner ? 'scale-105 ring-4 ring-yellow-400' : ''}`}>
             <div className={`rounded-[2.2rem] p-6 text-center transition-all duration-500 ${isBuzzerWinner ? 'bg-gradient-to-br from-indigo-500 to-purple-600' : 'bg-slate-50'}`}>
                 <h3 className={`font-black uppercase tracking-widest text-sm mb-4 ${isBuzzerWinner ? 'text-white' : 'text-slate-400'}`}>
-                    {isBuzzerWinner ? 'CHIẾN THẮNG!' : isBuzzerLocked ? 'ĐÃ KHÓA' : 'NHẤN CHUÔNG'}
+                    {isBuzzerWinner ? 'CHIẾN THẮNG!' : !state.buzzerActive ? 'CHỜ HIỆU LỆNH...' : 'NHẤN NGAY!'}
                 </h3>
                 
                 <button
                     onClick={pressBuzzer}
                     disabled={isBuzzerLocked || buzzerPressed}
-                    className={`w-full aspect-square rounded-full flex flex-col items-center justify-center transition-all duration-150 relative overflow-hidden group
+                    className={`w-full aspect-square rounded-full flex flex-col items-center justify-center transition-all duration-200 relative overflow-hidden group
                         ${isBuzzerWinner 
                             ? 'bg-yellow-400 text-yellow-900 shadow-[0_10px_0_rgb(202,138,4)] translate-y-0' 
-                            : isBuzzerLocked 
+                            : !state.buzzerActive // Nếu GV chưa mở -> Xám
                                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' 
-                                : 'bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-[0_8px_0_rgb(55,48,163)] active:shadow-none active:translate-y-[8px] hover:brightness-110'
+                                : 'bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-[0_8px_0_rgb(55,48,163)] active:shadow-none active:translate-y-[8px] hover:brightness-110' // Xanh (Sẵn sàng)
                         }
                     `}
                 >
                     <Bell className={`w-20 h-20 ${isBuzzerWinner ? 'animate-wiggle' : ''} drop-shadow-md`} strokeWidth={2.5} />
                     {isBuzzerWinner && <div className="absolute inset-0 bg-white/20 animate-pulse"></div>}
+                    
+                    {/* Hiển thị chữ trạng thái */}
+                    {!state.buzzerActive && !state.buzzerWinnerId && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/5">
+                             <Lock className="opacity-20 w-16 h-16" />
+                        </div>
+                    )}
                 </button>
             </div>
         </div>
