@@ -18,7 +18,6 @@ export const StudentView: React.FC<Props> = ({ session, store, onLogout }) => {
   const myStatus = state.students[session.id];
   const { wallConfig, messages } = state;
   
-  // 1. KHAI BÁO TẤT CẢ HOOKS Ở ĐÂY (TRƯỚC KHI RETURN)
   const [buzzerPressed, setBuzzerPressed] = useState(false);
   const [messageText, setMessageText] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -29,37 +28,28 @@ export const StudentView: React.FC<Props> = ({ session, store, onLogout }) => {
   const isBuzzerWinner = state.buzzerWinnerId === session.id;
   const isBuzzerLocked = !state.buzzerActive || (state.buzzerWinnerId !== null && !isBuzzerWinner);
 
-  // useEffect 1: Xử lý pháo giấy
   useEffect(() => {
     if (state.buzzerWinnerId === null) {
       setBuzzerPressed(false);
     } else if (isBuzzerWinner) {
-       // Dùng bản confetti mặc định để tránh lỗi
        const fire = (confetti as any).default || confetti;
-       fire({
-         particleCount: 100,
-         spread: 70,
-         origin: { y: 0.6 }
-       });
+       fire({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
     }
   }, [state.buzzerWinnerId, isBuzzerWinner]);
 
-  // useEffect 2: Cuộn chat xuống cuối
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length, wallConfig.isPublic]);
 
-  // 2. SAU KHI KHAI BÁO HẾT HOOKS, MỚI ĐƯỢC CHECK ĐIỀU KIỆN RETURN
   if (!myStatus) {
      return (
-       <div className="flex flex-col items-center justify-center h-screen bg-gray-50 text-gray-500 gap-3">
-          <div className="w-6 h-6 border-2 border-brand-blue border-t-transparent rounded-full animate-spin"></div>
-          <p>Đang kết nối vào lớp...</p>
+       <div className="flex flex-col items-center justify-center h-screen bg-slate-50 text-slate-500 gap-4">
+          <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="font-bold animate-pulse">Đang kết nối vào lớp...</p>
        </div>
      );
   }
 
-  // --- Logic xử lý sự kiện ---
   const toggleStatus = (key: keyof StudentStatus) => {
     // @ts-ignore
     updateStudentStatus(session.id, { [key]: !myStatus[key] });
@@ -109,127 +99,113 @@ export const StudentView: React.FC<Props> = ({ session, store, onLogout }) => {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-slate-100 flex flex-col font-sans">
       {/* Header */}
-      <header className="bg-white p-4 shadow-sm border-b sticky top-0 z-20">
+      <header className="bg-white px-4 py-3 shadow-sm border-b border-slate-200 sticky top-0 z-20">
         <div className="max-w-md mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3">
                  <img 
                     src={`https://picsum.photos/seed/${myStatus.avatarSeed}/50/50`} 
                     alt="avatar" 
-                    className="w-10 h-10 rounded-full border-2 border-brand-blue"
+                    className="w-10 h-10 rounded-full border-2 border-indigo-500 shadow-sm"
                  />
                  <div>
-                    <h2 className="font-bold text-gray-800 leading-tight">{session.name}</h2>
-                    <p className="text-xs text-gray-500">Tổ {myStatus.group}</p>
+                    <h2 className="font-bold text-slate-800 leading-tight text-lg">{session.name}</h2>
+                    <p className="text-xs font-bold text-indigo-500 uppercase tracking-wide">Tổ {myStatus.group}</p>
                  </div>
             </div>
-            <div className="flex items-center gap-3">
-                <div className="flex gap-1">
-                    {myStatus.needsHelp && <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>}
-                    {myStatus.isFinished && <div className="w-3 h-3 bg-green-500 rounded-full"></div>}
-                    {myStatus.handRaised && <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>}
-                </div>
-                <button
-                  onClick={onLogout}
-                  className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors ml-2"
-                  title="Thoát lớp học"
-                >
-                  <LogOut size={20} />
-                </button>
-            </div>
+            <button onClick={onLogout} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors">
+              <LogOut size={24} />
+            </button>
         </div>
       </header>
 
       {/* Main Actions */}
-      <main className="flex-1 p-4 max-w-md mx-auto w-full space-y-4 pb-4">
+      <main className="flex-1 p-4 max-w-md mx-auto w-full space-y-4 pb-6">
         
         {/* Buzzer Section */}
-        <div className={`p-6 rounded-3xl transition-all duration-500 ${
-            isBuzzerWinner ? 'bg-blue-600 shadow-blue-400/50 shadow-2xl scale-105' : 
-            isBuzzerLocked ? 'bg-gray-200 opacity-80' : 'bg-white shadow-lg'
-        }`}>
-            <h3 className={`text-center font-bold mb-4 uppercase tracking-wider ${isBuzzerWinner ? 'text-white' : 'text-gray-500'}`}>
-                {isBuzzerWinner ? 'BẠN ĐÃ NHANH NHẤT!' : isBuzzerLocked ? 'Chuông đã khóa' : 'Nhấn chuông'}
-            </h3>
-            
-            <button
-                onClick={pressBuzzer}
-                disabled={isBuzzerLocked || buzzerPressed}
-                className={`w-full aspect-square rounded-full flex flex-col items-center justify-center shadow-inner transition-all duration-150
-                    ${isBuzzerWinner 
-                        ? 'bg-yellow-400 text-yellow-900 animate-bounce' 
-                        : isBuzzerLocked 
-                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                            : 'bg-gradient-to-br from-brand-blue to-blue-700 text-white shadow-blue-900 active:scale-90 active:shadow-none'
-                    }
-                `}
-            >
-                <Bell className={`w-16 h-16 ${isBuzzerWinner ? 'animate-wiggle' : ''}`} />
-                {isBuzzerWinner && <span className="mt-2 font-bold text-lg">CHIẾN THẮNG!</span>}
-            </button>
+        <div className={`p-1 rounded-[2.5rem] bg-white shadow-xl transition-all duration-300 ${isBuzzerWinner ? 'scale-105 ring-4 ring-yellow-400' : ''}`}>
+            <div className={`rounded-[2.2rem] p-6 text-center transition-all duration-500 ${isBuzzerWinner ? 'bg-gradient-to-br from-indigo-500 to-purple-600' : 'bg-slate-50'}`}>
+                <h3 className={`font-black uppercase tracking-widest text-sm mb-4 ${isBuzzerWinner ? 'text-white' : 'text-slate-400'}`}>
+                    {isBuzzerWinner ? 'CHIẾN THẮNG!' : isBuzzerLocked ? 'ĐÃ KHÓA' : 'NHẤN CHUÔNG'}
+                </h3>
+                
+                <button
+                    onClick={pressBuzzer}
+                    disabled={isBuzzerLocked || buzzerPressed}
+                    className={`w-full aspect-square rounded-full flex flex-col items-center justify-center transition-all duration-150 relative overflow-hidden group
+                        ${isBuzzerWinner 
+                            ? 'bg-yellow-400 text-yellow-900 shadow-[0_10px_0_rgb(202,138,4)] translate-y-0' 
+                            : isBuzzerLocked 
+                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' 
+                                : 'bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-[0_8px_0_rgb(55,48,163)] active:shadow-none active:translate-y-[8px] hover:brightness-110'
+                        }
+                    `}
+                >
+                    <Bell className={`w-20 h-20 ${isBuzzerWinner ? 'animate-wiggle' : ''} drop-shadow-md`} strokeWidth={2.5} />
+                    {isBuzzerWinner && <div className="absolute inset-0 bg-white/20 animate-pulse"></div>}
+                </button>
+            </div>
         </div>
 
         {/* Action Grid */}
         <div className="grid grid-cols-2 gap-4">
             <button
                 onClick={() => toggleStatus('isFinished')}
-                className={`p-6 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all border-b-4 active:border-b-0 active:translate-y-1
+                className={`p-5 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all shadow-[0_4px_0_rgb(0,0,0,0.1)] active:shadow-none active:translate-y-[4px] border-2
                     ${myStatus.isFinished 
-                        ? 'bg-green-100 border-green-500 text-green-700' 
-                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                        ? 'bg-green-500 border-green-600 text-white shadow-[0_4px_0_rgb(21,128,61)]' 
+                        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
                     }
                 `}
             >
-                <CheckCircle className={`w-10 h-10 ${myStatus.isFinished ? 'fill-current' : ''}`} />
-                <span className="font-bold">Làm xong</span>
+                <CheckCircle className="w-8 h-8" strokeWidth={3} />
+                <span className="font-bold text-lg">Xong Bài</span>
             </button>
 
              <button
                 onClick={() => toggleStatus('handRaised')}
-                className={`p-6 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all border-b-4 active:border-b-0 active:translate-y-1
+                className={`p-5 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all shadow-[0_4px_0_rgb(0,0,0,0.1)] active:shadow-none active:translate-y-[4px] border-2
                     ${myStatus.handRaised 
-                        ? 'bg-yellow-100 border-yellow-500 text-yellow-700' 
-                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                        ? 'bg-yellow-400 border-yellow-500 text-yellow-900 shadow-[0_4px_0_rgb(202,138,4)]' 
+                        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
                     }
                 `}
             >
-                <Hand className={`w-10 h-10 ${myStatus.handRaised ? 'fill-current' : ''}`} />
-                <span className="font-bold">Giơ tay</span>
+                <Hand className="w-8 h-8" strokeWidth={3} />
+                <span className="font-bold text-lg">Giơ Tay</span>
             </button>
         </div>
 
         <button
             onClick={() => toggleStatus('needsHelp')}
-            className={`w-full p-6 rounded-2xl flex items-center justify-center gap-4 transition-all border-b-4 active:border-b-0 active:translate-y-1
+            className={`w-full p-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-[0_4px_0_rgb(0,0,0,0.1)] active:shadow-none active:translate-y-[4px] border-2
                 ${myStatus.needsHelp 
-                    ? 'bg-red-500 border-red-700 text-white animate-pulse' 
-                    : 'bg-white border-gray-200 text-red-500 hover:bg-red-50'
+                    ? 'bg-red-500 border-red-600 text-white shadow-[0_4px_0_rgb(185,28,28)] animate-pulse' 
+                    : 'bg-white border-slate-200 text-red-500 hover:bg-red-50'
                 }
             `}
         >
             <AlertCircle className="w-8 h-8" />
-            <span className="font-bold text-xl">{myStatus.needsHelp ? 'Đang chờ cô giáo...' : 'Em cần giúp đỡ!'}</span>
+            <span className="font-bold text-xl">{myStatus.needsHelp ? 'ĐANG CHỜ CÔ...' : 'EM CẦN GIÚP!'}</span>
         </button>
 
         {/* CLASS WALL */}
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden flex flex-col h-[500px]">
-          <div className="p-3 bg-brand-light border-b flex justify-between items-center">
-             <h3 className="font-bold text-brand-blue flex items-center gap-2">
-               Tường Lớp Học
-               {!wallConfig.isPublic && <Lock size={14} className="text-gray-400" />}
+        <div className="bg-white rounded-3xl shadow-lg border border-slate-100 overflow-hidden flex flex-col h-[450px]">
+          <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+             <h3 className="font-bold text-indigo-600 flex items-center gap-2">
+               <span className="bg-indigo-100 p-1.5 rounded-lg"><Send size={16}/></span> Tường Lớp
              </h3>
-             <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded-full border">
-                {wallConfig.isPublic ? (wallConfig.showNames ? 'Công khai' : 'Công khai (Ẩn danh)') : 'Chỉ mình bạn thấy'}
+             <span className={`text-[10px] font-bold px-3 py-1 rounded-full border ${wallConfig.isPublic ? 'bg-green-100 text-green-700 border-green-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                {wallConfig.isPublic ? (wallConfig.showNames ? 'CÔNG KHAI' : 'ẨN DANH') : 'RIÊNG TƯ'}
              </span>
           </div>
 
-          {/* Wall Feed */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
              {visibleMessages.length === 0 && (
-               <div className="text-center py-10 text-gray-400 text-sm">
-                 <p>{wallConfig.isPublic ? "Chưa có bài đăng nào trên tường." : "Bạn chưa đăng bài nào."}</p>
-                 <p className="text-xs mt-1">Hãy chia sẻ suy nghĩ hoặc hình ảnh!</p>
+               <div className="text-center py-10 text-slate-300">
+                 <p className="font-bold">{wallConfig.isPublic ? "Chưa có tin nhắn nào" : "Bạn chưa gửi gì"}</p>
+                 <p className="text-xs mt-1">Gửi lời chào đến cả lớp nhé!</p>
                </div>
              )}
              
@@ -240,17 +216,18 @@ export const StudentView: React.FC<Props> = ({ session, store, onLogout }) => {
                return (
                  <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                     <div className={`max-w-[85%] rounded-2xl p-3 shadow-sm ${
-                        isMe ? 'bg-brand-blue text-white rounded-br-none' : 'bg-white border border-gray-200 rounded-bl-none'
+                        isMe ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-br-none' : 'bg-white border border-slate-100 rounded-bl-none text-slate-700'
                     }`}>
-                        <div className={`text-xs font-bold mb-1 ${isMe ? 'text-blue-100' : 'text-gray-500'} flex items-center gap-1`}>
-                            {showName ? msg.senderName : <><EyeOff size={10} /> Bạn cùng lớp</>}
+                        <div className={`text-[10px] font-bold mb-1 ${isMe ? 'text-indigo-200' : 'text-slate-400'} flex items-center gap-1 uppercase tracking-wide`}>
+                            {showName ? msg.senderName : 'Bạn bí ẩn'}
+                            {!showName && <EyeOff size={10} />}
                         </div>
                         
                         {msg.imageUrl && (
                           <img src={msg.imageUrl} alt="post" className="rounded-lg mb-2 max-h-40 object-cover w-full border border-black/10" />
                         )}
                         
-                        {msg.text && <p className="text-sm break-words">{msg.text}</p>}
+                        {msg.text && <p className="text-sm font-medium">{msg.text}</p>}
                     </div>
                  </div>
                );
@@ -258,11 +235,10 @@ export const StudentView: React.FC<Props> = ({ session, store, onLogout }) => {
              <div ref={messagesEndRef} />
           </div>
           
-          {/* Input Area */}
-          <div className="p-3 border-t bg-white">
+          <div className="p-3 border-t border-slate-100 bg-white">
              {selectedImage && (
                 <div className="relative mb-2 inline-block">
-                  <img src={selectedImage} alt="Preview" className="h-16 w-auto rounded-lg border shadow-sm" />
+                  <img src={selectedImage} alt="Preview" className="h-16 w-auto rounded-xl border-2 border-slate-200 shadow-sm" />
                   <button 
                     onClick={() => setSelectedImage(null)}
                     className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600"
@@ -276,9 +252,9 @@ export const StudentView: React.FC<Props> = ({ session, store, onLogout }) => {
                 <button 
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="p-3 text-gray-500 bg-gray-100 rounded-xl hover:bg-brand-light hover:text-brand-blue transition-colors"
+                  className="p-3 text-slate-400 bg-slate-100 rounded-2xl hover:bg-indigo-50 hover:text-indigo-500 transition-colors"
                 >
-                  <ImageIcon size={20} />
+                  <ImageIcon size={24} />
                 </button>
                 <input 
                   type="file"
@@ -291,15 +267,15 @@ export const StudentView: React.FC<Props> = ({ session, store, onLogout }) => {
                   type="text"
                   value={messageText}
                   onChange={(e) => setMessageText(e.target.value)}
-                  placeholder="Viết lên tường lớp..."
-                  className="flex-1 bg-gray-100 px-4 rounded-xl outline-none focus:ring-2 focus:ring-brand-blue/50"
+                  placeholder="Nhập tin nhắn..."
+                  className="flex-1 bg-slate-100 px-4 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/50 font-medium text-slate-700 transition-all focus:bg-white border border-transparent focus:border-indigo-200"
                 />
                 <button 
                   type="submit" 
                   disabled={!messageText.trim() && !selectedImage}
-                  className="bg-brand-blue text-white p-3 rounded-xl disabled:opacity-50 hover:bg-blue-700 transition-colors shadow-md shadow-blue-200"
+                  className="bg-indigo-600 text-white p-3 rounded-2xl disabled:opacity-50 disabled:shadow-none hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 active:scale-95"
                 >
-                  <Send size={20} />
+                  <Send size={24} />
                 </button>
               </form>
           </div>

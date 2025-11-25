@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { UserRole } from '../types';
-import { User, GraduationCap, ArrowRight } from 'lucide-react';
+import { User, GraduationCap, ArrowRight, Lock, KeyRound } from 'lucide-react';
 
 interface Props {
   onJoin: (name: string, role: UserRole, group?: string) => void;
@@ -8,85 +8,130 @@ interface Props {
 
 export const WelcomeScreen: React.FC<Props> = ({ onJoin }) => {
   const [name, setName] = useState('');
+  const [passcode, setPasscode] = useState('');
   const [role, setRole] = useState<UserRole | null>(null);
   const [group, setGroup] = useState('1');
+  const [error, setError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim() && role) {
-      onJoin(name, role, group);
+    setError('');
+
+    if (role === UserRole.TEACHER) {
+      if (passcode === 'Chau') {
+        onJoin('Thầy Châu', UserRole.TEACHER); // Tự động đặt tên
+      } else {
+        setError('Mã xác nhận không đúng!');
+      }
+    } else {
+      if (name.trim()) {
+        onJoin(name, UserRole.STUDENT, group);
+      }
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-600 p-4">
-      <div className="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-md border-4 border-white/20">
-        <div className="text-center mb-8">
-          <h1 className="text-5xl font-extrabold text-brand-blue mb-3 tracking-tight">ClassRoomie</h1>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-4 font-sans">
+      <div className="bg-white/95 backdrop-blur-sm p-8 rounded-3xl shadow-2xl w-full max-w-md border border-white/50 relative overflow-hidden">
+        {/* Decorative background circle */}
+        <div className="absolute -top-20 -right-20 w-60 h-60 bg-purple-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
+        <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-indigo-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
+
+        <div className="text-center mb-8 relative z-10">
+          <h1 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 mb-2 tracking-tight drop-shadow-sm">
+            ClassRoomie
+          </h1>
           <p className="text-slate-500 font-medium text-lg">Lớp học vui vẻ & kết nối!</p>
         </div>
 
         {!role ? (
-          <div className="space-y-4">
-            <h2 className="text-xl font-bold text-center text-slate-800 mb-6 uppercase tracking-wide">Bạn là ai?</h2>
+          <div className="space-y-4 relative z-10">
+            <h2 className="text-xl font-bold text-center text-slate-700 mb-6 uppercase tracking-wide">Bạn là ai?</h2>
+            
             <button
               onClick={() => setRole(UserRole.STUDENT)}
-              className="w-full p-5 rounded-2xl bg-white border-2 border-slate-200 hover:border-brand-blue hover:bg-blue-50 transition-all flex items-center justify-between group shadow-sm hover:shadow-md"
+              className="w-full p-4 rounded-2xl bg-white border-2 border-slate-100 hover:border-blue-400 hover:bg-blue-50 transition-all duration-300 flex items-center justify-between group shadow-sm hover:shadow-lg transform hover:-translate-y-1"
             >
               <div className="flex items-center gap-4">
-                <div className="bg-blue-100 p-3 rounded-full group-hover:bg-blue-200 transition-colors">
-                  <User className="w-8 h-8 text-brand-blue" />
+                <div className="bg-blue-100 p-3 rounded-xl group-hover:bg-blue-500 group-hover:text-white transition-colors duration-300">
+                  <User className="w-8 h-8 text-blue-600 group-hover:text-white" />
                 </div>
-                <span className="text-xl font-bold text-slate-700 group-hover:text-brand-blue">Học Sinh</span>
+                <div className="text-left">
+                  <span className="block text-xl font-bold text-slate-700 group-hover:text-blue-700">Học Sinh</span>
+                  <span className="text-xs text-slate-400 font-medium">Tham gia lớp học</span>
+                </div>
               </div>
-              <ArrowRight className="w-6 h-6 text-slate-300 group-hover:text-brand-blue transition-colors" />
+              <ArrowRight className="w-6 h-6 text-slate-300 group-hover:text-blue-500 transition-transform group-hover:translate-x-1" />
             </button>
 
             <button
               onClick={() => setRole(UserRole.TEACHER)}
-              className="w-full p-5 rounded-2xl bg-white border-2 border-slate-200 hover:border-purple-500 hover:bg-purple-50 transition-all flex items-center justify-between group shadow-sm hover:shadow-md"
+              className="w-full p-4 rounded-2xl bg-white border-2 border-slate-100 hover:border-purple-400 hover:bg-purple-50 transition-all duration-300 flex items-center justify-between group shadow-sm hover:shadow-lg transform hover:-translate-y-1"
             >
               <div className="flex items-center gap-4">
-                <div className="bg-purple-100 p-3 rounded-full group-hover:bg-purple-200 transition-colors">
-                  <GraduationCap className="w-8 h-8 text-purple-600" />
+                <div className="bg-purple-100 p-3 rounded-xl group-hover:bg-purple-500 group-hover:text-white transition-colors duration-300">
+                  <GraduationCap className="w-8 h-8 text-purple-600 group-hover:text-white" />
                 </div>
-                <span className="text-xl font-bold text-slate-700 group-hover:text-purple-700">Giáo Viên</span>
+                <div className="text-left">
+                  <span className="block text-xl font-bold text-slate-700 group-hover:text-purple-700">Giáo Viên</span>
+                  <span className="text-xs text-slate-400 font-medium">Quản lý lớp học</span>
+                </div>
               </div>
-              <ArrowRight className="w-6 h-6 text-slate-300 group-hover:text-purple-600 transition-colors" />
+              <ArrowRight className="w-6 h-6 text-slate-300 group-hover:text-purple-500 transition-transform group-hover:translate-x-1" />
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-6 animate-fade-in">
-            <div>
-              <label className="block text-base font-bold text-slate-900 mb-2">
-                {role === UserRole.TEACHER ? 'Tên thầy/cô:' : 'Tên của em:'}
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder={role === UserRole.TEACHER ? "Ví dụ: Cô Hạnh" : "Ví dụ: Nguyễn Văn An"}
-                className="w-full px-4 py-3 rounded-xl border-2 border-slate-300 bg-slate-50 text-slate-900 placeholder-slate-400 focus:bg-white focus:border-brand-blue focus:ring-4 focus:ring-blue-100 outline-none transition-all text-lg font-semibold"
-                autoFocus
-                required
-              />
-            </div>
+          <form onSubmit={handleSubmit} className="space-y-6 animate-in slide-in-from-right duration-300 relative z-10">
+            {role === UserRole.TEACHER ? (
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide flex items-center gap-2">
+                  <Lock size={16} className="text-purple-500"/> Nhập mã bí mật
+                </label>
+                <div className="relative">
+                  <input
+                    type="password"
+                    value={passcode}
+                    onChange={(e) => setPasscode(e.target.value)}
+                    placeholder="Nhập mã code..."
+                    className="w-full px-5 py-4 pl-12 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-900 focus:bg-white focus:border-purple-500 focus:ring-4 focus:ring-purple-100 outline-none transition-all text-xl font-bold tracking-widest placeholder:tracking-normal placeholder:font-normal"
+                    autoFocus
+                  />
+                  <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={24} />
+                </div>
+                {error && <p className="text-red-500 text-sm mt-2 font-semibold flex items-center gap-1"><AlertCircle size={14}/> {error}</p>}
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">
+                  Tên của em là gì?
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ví dụ: Nguyễn Văn An"
+                  className="w-full px-5 py-4 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-900 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all text-lg font-bold"
+                  autoFocus
+                  required
+                />
+              </div>
+            )}
 
             {role === UserRole.STUDENT && (
               <div>
-                 <label className="block text-base font-bold text-slate-900 mb-2">
+                 <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">
                    Em thuộc tổ mấy?
                  </label>
-                 <div className="grid grid-cols-4 gap-2">
+                 <div className="grid grid-cols-4 gap-3">
                     {['1', '2', '3', '4'].map((g) => (
                       <button
                         key={g}
                         type="button"
                         onClick={() => setGroup(g)}
-                        className={`py-3 rounded-lg font-bold border-2 transition-all text-lg shadow-sm ${
+                        className={`py-3 rounded-xl font-extrabold border-2 transition-all text-xl shadow-sm ${
                           group === g 
-                            ? 'bg-brand-blue text-white border-brand-blue ring-2 ring-blue-300 ring-offset-1' 
-                            : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400 hover:bg-slate-50'
+                            ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white border-transparent scale-105 shadow-blue-300' 
+                            : 'bg-white text-slate-400 border-slate-200 hover:border-blue-300 hover:text-blue-500'
                         }`}
                       >
                         {g}
@@ -99,16 +144,20 @@ export const WelcomeScreen: React.FC<Props> = ({ onJoin }) => {
             <div className="flex gap-3 pt-4">
                <button
                 type="button"
-                onClick={() => setRole(null)}
-                className="px-6 py-3 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 hover:text-slate-900 transition-colors"
+                onClick={() => { setRole(null); setError(''); setPasscode(''); }}
+                className="px-6 py-3 rounded-xl font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors"
               >
                 Quay lại
               </button>
               <button
                 type="submit"
-                className="flex-1 bg-brand-blue text-white py-3 rounded-xl font-bold text-lg hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-500/30 ring-offset-2 focus:ring-2 ring-brand-blue"
+                className={`flex-1 py-3 rounded-xl font-bold text-lg text-white shadow-lg shadow-purple-200 active:scale-95 transition-all
+                  ${role === UserRole.TEACHER 
+                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700' 
+                    : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
+                  }`}
               >
-                Vào Lớp Ngay
+                {role === UserRole.TEACHER ? 'Mở Lớp Học' : 'Vào Lớp Ngay'}
               </button>
             </div>
           </form>
@@ -117,3 +166,10 @@ export const WelcomeScreen: React.FC<Props> = ({ onJoin }) => {
     </div>
   );
 };
+
+// Component icon phụ trợ
+function AlertCircle({ size }: { size: number }) {
+    return (
+        <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+    )
+}
