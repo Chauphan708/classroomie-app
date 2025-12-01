@@ -28,15 +28,12 @@ export const StudentView: React.FC<Props> = ({ session, store, onLogout }) => {
   const isBuzzerWinner = state.buzzerWinnerId === session.id;
   const isBuzzerLocked = !state.buzzerActive || (state.buzzerWinnerId !== null && !isBuzzerWinner);
 
-  // --- SỬA LỖI TẠI ĐÂY: Thêm kiểm tra an toàn (? và || []) ---
-  // Nếu wallConfig chưa tải xong hoặc thiếu dữ liệu, mặc định là KHÔNG KHÓA
   const safeLocked = wallConfig?.isLocked || false;
   const safeAllowedList = wallConfig?.allowedStudentIds || [];
   const canPost = !safeLocked || safeAllowedList.includes(session.id);
 
   useEffect(() => { if (state.buzzerWinnerId === null || state.buzzerActive) { setBuzzerPressed(false); } }, [state.buzzerWinnerId, state.buzzerActive]);
   useEffect(() => { if (isBuzzerWinner) { const fire = (confetti as any).default || confetti; fire({ particleCount: 200, spread: 100, origin: { y: 0.6 }, ticks: 300 }); } }, [isBuzzerWinner]);
-  // Thêm kiểm tra an toàn cho wallConfig.isPublic
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length, wallConfig?.isPublic]);
 
   if (!myStatus) { return ( <div className="flex flex-col items-center justify-center h-screen bg-slate-50 text-slate-500 gap-4"><div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div><p className="font-bold animate-pulse">Đang kết nối vào lớp...</p></div> ); }
@@ -47,8 +44,6 @@ export const StudentView: React.FC<Props> = ({ session, store, onLogout }) => {
   const pressBuzzer = () => { if (!isBuzzerLocked && !buzzerPressed) { setBuzzerPressed(true); updateStudentStatus(session.id, { buzzerPressedAt: Date.now() }); } };
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => { const img = new Image(); img.src = reader.result as string; img.onload = () => { const canvas = document.createElement('canvas'); const MAX_WIDTH = 400; const scaleSize = MAX_WIDTH / img.width; canvas.width = MAX_WIDTH; canvas.height = img.height * scaleSize; const ctx = canvas.getContext('2d'); ctx?.drawImage(img, 0, 0, canvas.width, canvas.height); setSelectedImage(canvas.toDataURL('image/jpeg', 0.7)); }; }; reader.readAsDataURL(file); } };
   const handleSend = (e: React.FormEvent) => { e.preventDefault(); if (messageText.trim() || selectedImage) { sendMessage(session.id, session.name, UserRole.STUDENT, messageText, selectedImage || undefined); setMessageText(''); setSelectedImage(null); } };
-  
-  // Kiểm tra an toàn cho wallConfig.isPublic
   const visibleMessages = messages.filter(msg => { if (msg.role === UserRole.TEACHER) return true; if (wallConfig?.isPublic) return true; return msg.senderId === session.id; });
 
   return (
@@ -67,17 +62,15 @@ export const StudentView: React.FC<Props> = ({ session, store, onLogout }) => {
         <div className="bg-white rounded-3xl shadow-lg border border-slate-100 overflow-hidden flex flex-col h-[450px]">
           <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
              <h3 className="font-bold text-indigo-600 flex items-center gap-2"><span className="bg-indigo-100 p-1.5 rounded-lg"><Send size={16}/></span> Tường Lớp</h3>
-             {/* Hiển thị trạng thái an toàn */}
              <span className={`text-[10px] font-bold px-3 py-1 rounded-full border ${wallConfig?.isPublic ? 'bg-green-100 text-green-700 border-green-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{wallConfig?.isPublic ? (wallConfig?.showNames ? 'CÔNG KHAI' : 'ẨN DANH') : 'RIÊNG TƯ'}</span>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
              {visibleMessages.length === 0 && (<div className="text-center py-10 text-slate-300"><p className="font-bold">{wallConfig?.isPublic ? "Chưa có tin nhắn nào" : "Bạn chưa gửi gì"}</p><p className="text-xs mt-1">Gửi lời chào đến cả lớp nhé!</p></div>)}
-             {visibleMessages.map(msg => { const isMe = msg.senderId === session.id; const isTeacher = msg.role === UserRole.TEACHER; const showName = isMe || isTeacher || wallConfig?.showNames; return ( <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}> <div className={`max-w-[85%] rounded-2xl p-3 shadow-sm ${isTeacher ? 'bg-purple-600 text-white rounded-bl-none shadow-md border-2 border-purple-200' : isMe ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-br-none' : 'bg-white border border-slate-100 rounded-bl-none text-slate-700'}`}> <div className={`text-[10px] font-bold mb-1 ${isTeacher ? 'text-yellow-300' : isMe ? 'text-indigo-200' : 'text-slate-400'} flex items-center gap-1 uppercase tracking-wide`}> {showName ? msg.senderName : 'Bạn bí ẩn'} {!showName && <EyeOff size={10} />} {isTeacher && <span className="ml-1 bg-yellow-400 text-purple-900 px-1 rounded text-[8px]">GV</span>}</div> {msg.imageUrl && ( <img src={msg.imageUrl} alt="post" className="rounded-lg mb-2 max-h-40 object-cover w-full border border-black/10" /> )} {msg.text && <p className="text-sm font-medium">{msg.text}</p>} </div> </div> ); })}
+             {visibleMessages.map(msg => { const isMe = msg.senderId === session.id; const isTeacher = msg.role === UserRole.TEACHER; const showName = isMe || isTeacher || wallConfig?.showNames; return ( <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}> <div className={`max-w-[85%] rounded-2xl p-3 shadow-sm ${isTeacher ? 'bg-purple-600 text-white rounded-bl-none shadow-md border-2 border-purple-200' : isMe ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-br-none' : 'bg-white border border-slate-100 rounded-bl-none text-slate-700'}`}> <div className={`text-[10px] font-bold mb-1 ${isTeacher ? 'text-yellow-300' : isMe ? 'text-indigo-200' : 'text-slate-400'} flex items-center gap-1 uppercase tracking-wide`}> {showName ? (isTeacher ? 'Thầy Châu' : msg.senderName) : 'Bạn bí ẩn'} {!showName && <EyeOff size={10} />} {isTeacher && <span className="ml-1 bg-yellow-400 text-purple-900 px-1 rounded text-[8px]">GV</span>}</div> {msg.imageUrl && ( <img src={msg.imageUrl} alt="post" className="rounded-lg mb-2 max-h-40 object-cover w-full border border-black/10" /> )} {msg.text && <p className="text-sm font-medium">{msg.text}</p>} </div> </div> ); })}
              <div ref={messagesEndRef} />
           </div>
           
           <div className="p-3 border-t border-slate-100 bg-white">
-             {/* SỬ DỤNG BIẾN canPost ĐÃ ĐƯỢC KIỂM TRA AN TOÀN */}
              {canPost ? (
                  <>
                      {selectedImage && (<div className="relative mb-2 inline-block"><img src={selectedImage} alt="Preview" className="h-16 w-auto rounded-xl border-2 border-slate-200 shadow-sm" /><button onClick={() => setSelectedImage(null)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600"><X size={12} /></button></div>)}

@@ -33,13 +33,7 @@ export const TeacherView: React.FC<Props> = ({ store, onLogout }) => {
   const students: StudentStatus[] = Object.values(state.students);
   const messages = state.messages;
   
-  // --- SỬA LỖI TẠI ĐÂY: Lấy wallConfig an toàn ---
-  const wallConfig = state.wallConfig || { 
-      isPublic: true, 
-      showNames: true, 
-      isLocked: false, 
-      allowedStudentIds: [] 
-  };
+  const wallConfig = state.wallConfig || { isPublic: true, showNames: true, isLocked: false, allowedStudentIds: [] };
   
   const prevStudentsRef = useRef<Record<string, StudentStatus>>({});
   const prevMessagesLengthRef = useRef(0);
@@ -66,17 +60,17 @@ export const TeacherView: React.FC<Props> = ({ store, onLogout }) => {
     audioRef.current.play().catch(e => console.log("Audio play blocked", e));
   };
   
-  // Thêm kiểm tra an toàn cho wallConfig?.isPublic trong dependency
   useEffect(() => { if (showActivityLog) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, showActivityLog, filterStatus, filterStudentId, wallConfig?.isPublic]);
   
   useEffect(() => { const prevStudents = prevStudentsRef.current; students.forEach(s => { const prev = prevStudents[s.id]; if (!prev) return; if (s.needsHelp && !prev.needsHelp) playSound('alert'); else if (s.handRaised && !prev.handRaised) playSound('hand'); else if (s.isFinished && !prev.isFinished) playSound('success'); }); if (messages.length > prevMessagesLengthRef.current && prevMessagesLengthRef.current > 0) playSound('message'); if (state.buzzerWinnerId && state.buzzerWinnerId !== prevWinnerRef.current) { playSound('buzzer'); } prevStudentsRef.current = { ...state.students }; prevMessagesLengthRef.current = messages.length; prevWinnerRef.current = state.buzzerWinnerId; }, [state.students, messages, state.buzzerWinnerId]);
   const handleAskAI = async (e: React.FormEvent) => { e.preventDefault(); if (!aiPrompt.trim()) return; setIsAiLoading(true); setAiResponse(null); const advice = await getTeacherAssistantAdvice(aiPrompt, state); setAiResponse(advice); setIsAiLoading(false); };
   const formatTime = (timestamp?: number) => { if (!timestamp) return ''; const diff = Math.floor((Date.now() - timestamp) / 60000); return diff < 1 ? 'Vừa xong' : `${diff} phút trước`; };
 
+  // --- SỬA TÊN NGƯỜI GỬI TẠI ĐÂY ---
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (messageText.trim() || selectedImage) {
-      sendMessage('teacher', 'Cô Giáo', UserRole.TEACHER, messageText, selectedImage || undefined);
+      sendMessage('teacher', 'Thầy Châu', UserRole.TEACHER, messageText, selectedImage || undefined);
       setMessageText('');
       setSelectedImage(null);
     }
@@ -101,7 +95,6 @@ export const TeacherView: React.FC<Props> = ({ store, onLogout }) => {
   };
 
   const toggleStudentChat = (studentId: string) => {
-     // --- SỬA LỖI TẠI ĐÂY: Kiểm tra allowedStudentIds tồn tại ---
      let newAllowed = [...(wallConfig.allowedStudentIds || [])];
      if (newAllowed.includes(studentId)) {
         newAllowed = newAllowed.filter(id => id !== studentId);
@@ -139,29 +132,14 @@ export const TeacherView: React.FC<Props> = ({ store, onLogout }) => {
              {state.buzzerWinnerId && (<div className="mb-8 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-6 text-white shadow-xl shadow-indigo-200 flex items-center justify-between animate-in zoom-in duration-300"><div className="flex items-center gap-6"><div className="bg-white/20 p-4 rounded-full backdrop-blur-sm"><Bell className="w-10 h-10 animate-bounce" /></div><div><p className="text-indigo-100 text-sm font-bold uppercase tracking-wide opacity-80">Người nhanh nhất</p><h2 className="text-4xl font-black tracking-tight">{state.students[state.buzzerWinnerId]?.name || 'Unknown'}</h2></div></div><button onClick={resetBuzzer} className="bg-white text-indigo-600 px-6 py-2 rounded-xl font-bold shadow-lg hover:bg-indigo-50 transition-colors">Mở Vòng Mới</button></div>)}
              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
                 {students.map(student => {
-                    // --- SỬA LỖI TẠI ĐÂY: Kiểm tra an toàn cho mảng ---
                     const allowedList = wallConfig.allowedStudentIds || [];
                     const isChatAllowed = !wallConfig.isLocked || allowedList.includes(student.id);
                     return (
                         <div key={student.id} className={`relative p-4 rounded-2xl transition-all duration-300 flex flex-col items-center gap-3 group ${getCardColor(student)}`}>
                             <button onClick={() => removeStudent(student.id)} className="absolute top-2 right-2 text-slate-300 hover:text-red-500 p-1 rounded-full hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16} /></button>
-                            
-                            {/* Chỉ hiện nút Mic khi đã khóa */}
-                            {wallConfig.isLocked && (
-                                <button 
-                                    onClick={() => toggleStudentChat(student.id)} 
-                                    className={`absolute top-2 right-9 p-1.5 rounded-full transition-all shadow-sm border-2 ${isChatAllowed ? 'bg-green-100 text-green-600 border-green-200' : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-green-50 hover:text-green-500'}`}
-                                    title={isChatAllowed ? "Đang được phép chat" : "Đang bị cấm chat"}
-                                >
-                                    {isChatAllowed ? <Mic size={14} /> : <MicOff size={14} />}
-                                </button>
-                            )}
-
+                            {wallConfig.isLocked && ( <button onClick={() => toggleStudentChat(student.id)} className={`absolute top-2 right-9 p-1.5 rounded-full transition-all shadow-sm border-2 ${isChatAllowed ? 'bg-green-100 text-green-600 border-green-200' : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-green-50 hover:text-green-500'}`} title={isChatAllowed ? "Đang được phép chat" : "Đang bị cấm chat"}> {isChatAllowed ? <Mic size={14} /> : <MicOff size={14} />} </button> )}
                             <div className="absolute top-2 left-2 bg-slate-100 text-slate-500 text-[10px] font-black px-2 py-1 rounded-md">TỔ {student.group}</div>
-                            <div className="relative mt-2">
-                                <img src={`https://picsum.photos/seed/${student.avatarSeed}/100/100`} alt={student.name} className={`w-20 h-20 rounded-full border-4 shadow-sm object-cover ${state.buzzerWinnerId === student.id ? 'border-white' : 'border-slate-50'}`} />
-                                <div className="absolute -bottom-2 -right-2 flex gap-1">{student.needsHelp && <div className="p-1.5 bg-red-500 rounded-full text-white shadow-sm border-2 border-white"><AlertCircle size={14}/></div>}{student.isFinished && <div className="p-1.5 bg-green-500 rounded-full text-white shadow-sm border-2 border-white"><CheckCircle size={14}/></div>}{student.handRaised && <div className="p-1.5 bg-yellow-400 rounded-full text-white shadow-sm border-2 border-white"><Hand size={14}/></div>}</div>
-                            </div>
+                            <div className="relative mt-2"><img src={`https://picsum.photos/seed/${student.avatarSeed}/100/100`} alt={student.name} className={`w-20 h-20 rounded-full border-4 shadow-sm object-cover ${state.buzzerWinnerId === student.id ? 'border-white' : 'border-slate-50'}`} /><div className="absolute -bottom-2 -right-2 flex gap-1">{student.needsHelp && <div className="p-1.5 bg-red-500 rounded-full text-white shadow-sm border-2 border-white"><AlertCircle size={14}/></div>}{student.isFinished && <div className="p-1.5 bg-green-500 rounded-full text-white shadow-sm border-2 border-white"><CheckCircle size={14}/></div>}{student.handRaised && <div className="p-1.5 bg-yellow-400 rounded-full text-white shadow-sm border-2 border-white"><Hand size={14}/></div>}</div></div>
                             <div className="text-center w-full"><h3 className={`font-bold truncate px-2 text-lg ${state.buzzerWinnerId === student.id ? 'text-white' : 'text-slate-700'}`}>{student.name}</h3><div className="text-xs font-medium mt-1 min-h-[20px]">{student.needsHelp ? <span className="text-red-500 bg-red-50 px-2 py-0.5 rounded-full">Cần giúp {formatTime(student.needsHelpAt)}</span> : student.isFinished ? <span className="text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Xong {formatTime(student.isFinishedAt)}</span> : student.handRaised ? <span className="text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full">Giơ tay {formatTime(student.handRaisedAt)}</span> : ''}</div></div>
                         </div>
                     );
@@ -191,7 +169,10 @@ export const TeacherView: React.FC<Props> = ({ store, onLogout }) => {
                         <div key={msg.id} className={`bg-white p-4 rounded-2xl shadow-sm border border-slate-100 animate-in fade-in slide-in-from-bottom-2 ${isTeacher ? 'border-purple-200 bg-purple-50' : ''}`}>
                             <div className="flex justify-between items-start mb-2">
                                 <div className="flex items-center gap-2">
-                                    <span className={`font-bold text-sm ${isTeacher ? 'text-purple-700' : 'text-indigo-600'}`}>{isTeacher ? 'Cô Giáo' : wallConfig.showNames ? msg.senderName : 'Bạn giấu tên'}</span>
+                                    {/* --- SỬA HIỂN THỊ TÊN TẠI ĐÂY --- */}
+                                    <span className={`font-bold text-sm ${isTeacher ? 'text-purple-700' : 'text-indigo-600'}`}>
+                                        {isTeacher ? 'Thầy Châu' : wallConfig.showNames ? msg.senderName : 'Bạn giấu tên'}
+                                    </span>
                                     {isTeacher && <Sparkles size={12} className="text-yellow-500 fill-yellow-500"/>}
                                     {!wallConfig.showNames && !isTeacher && <EyeOff size={12} className="text-slate-300"/>}
                                 </div>
