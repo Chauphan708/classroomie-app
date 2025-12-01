@@ -3,7 +3,7 @@ import { ClassroomState, StudentStatus, WallConfig, UserRole } from '../types';
 import { 
   Users, Hand, CheckCircle, AlertCircle, Bell, RefreshCw, 
   Trash2, MessageSquare, Send, Sparkles, X, Loader2, LogOut, Globe, Eye, EyeOff, Lock, Unlock,
-  Download, Image as ImageIcon, Mic, MicOff, Shield, ShieldOff // Thêm icon mới
+  Download, Image as ImageIcon, Mic, MicOff, Shield, ShieldOff
 } from 'lucide-react';
 import { getTeacherAssistantAdvice } from '../services/geminiService';
 
@@ -32,8 +32,15 @@ export const TeacherView: React.FC<Props> = ({ store, onLogout }) => {
   const { state, updateWallConfig, resetBuzzer, lockBuzzer, resetAllStatuses, removeStudent, sendMessage } = store;
   const students: StudentStatus[] = Object.values(state.students);
   const messages = state.messages;
-  const { wallConfig } = state;
-
+  
+  // --- SỬA LỖI TẠI ĐÂY: Lấy wallConfig an toàn ---
+  const wallConfig = state.wallConfig || { 
+      isPublic: true, 
+      showNames: true, 
+      isLocked: false, 
+      allowedStudentIds: [] 
+  };
+  
   const prevStudentsRef = useRef<Record<string, StudentStatus>>({});
   const prevMessagesLengthRef = useRef(0);
   const prevWinnerRef = useRef<string | null>(null);
@@ -58,7 +65,10 @@ export const TeacherView: React.FC<Props> = ({ store, onLogout }) => {
     audioRef.current.volume = 1.0;
     audioRef.current.play().catch(e => console.log("Audio play blocked", e));
   };
-  useEffect(() => { if (showActivityLog) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, showActivityLog, filterStatus, filterStudentId, wallConfig.isPublic]);
+  
+  // Thêm kiểm tra an toàn cho wallConfig?.isPublic trong dependency
+  useEffect(() => { if (showActivityLog) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, showActivityLog, filterStatus, filterStudentId, wallConfig?.isPublic]);
+  
   useEffect(() => { const prevStudents = prevStudentsRef.current; students.forEach(s => { const prev = prevStudents[s.id]; if (!prev) return; if (s.needsHelp && !prev.needsHelp) playSound('alert'); else if (s.handRaised && !prev.handRaised) playSound('hand'); else if (s.isFinished && !prev.isFinished) playSound('success'); }); if (messages.length > prevMessagesLengthRef.current && prevMessagesLengthRef.current > 0) playSound('message'); if (state.buzzerWinnerId && state.buzzerWinnerId !== prevWinnerRef.current) { playSound('buzzer'); } prevStudentsRef.current = { ...state.students }; prevMessagesLengthRef.current = messages.length; prevWinnerRef.current = state.buzzerWinnerId; }, [state.students, messages, state.buzzerWinnerId]);
   const handleAskAI = async (e: React.FormEvent) => { e.preventDefault(); if (!aiPrompt.trim()) return; setIsAiLoading(true); setAiResponse(null); const advice = await getTeacherAssistantAdvice(aiPrompt, state); setAiResponse(advice); setIsAiLoading(false); };
   const formatTime = (timestamp?: number) => { if (!timestamp) return ''; const diff = Math.floor((Date.now() - timestamp) / 60000); return diff < 1 ? 'Vừa xong' : `${diff} phút trước`; };
@@ -90,13 +100,13 @@ export const TeacherView: React.FC<Props> = ({ store, onLogout }) => {
     const link = document.createElement('a'); link.href = url; link.download = `Tuong_Lop_${new Date().toLocaleDateString().replace(/\//g, '-')}.doc`; document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
 
-  // --- LOGIC PHÂN QUYỀN CHAT ---
   const toggleStudentChat = (studentId: string) => {
-     let newAllowed = [...wallConfig.allowedStudentIds];
+     // --- SỬA LỖI TẠI ĐÂY: Kiểm tra allowedStudentIds tồn tại ---
+     let newAllowed = [...(wallConfig.allowedStudentIds || [])];
      if (newAllowed.includes(studentId)) {
-        newAllowed = newAllowed.filter(id => id !== studentId); // Xóa khỏi danh sách cho phép
+        newAllowed = newAllowed.filter(id => id !== studentId);
      } else {
-        newAllowed.push(studentId); // Thêm vào danh sách cho phép
+        newAllowed.push(studentId);
      }
      updateWallConfig({ allowedStudentIds: newAllowed });
   };
@@ -129,14 +139,14 @@ export const TeacherView: React.FC<Props> = ({ store, onLogout }) => {
              {state.buzzerWinnerId && (<div className="mb-8 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-6 text-white shadow-xl shadow-indigo-200 flex items-center justify-between animate-in zoom-in duration-300"><div className="flex items-center gap-6"><div className="bg-white/20 p-4 rounded-full backdrop-blur-sm"><Bell className="w-10 h-10 animate-bounce" /></div><div><p className="text-indigo-100 text-sm font-bold uppercase tracking-wide opacity-80">Người nhanh nhất</p><h2 className="text-4xl font-black tracking-tight">{state.students[state.buzzerWinnerId]?.name || 'Unknown'}</h2></div></div><button onClick={resetBuzzer} className="bg-white text-indigo-600 px-6 py-2 rounded-xl font-bold shadow-lg hover:bg-indigo-50 transition-colors">Mở Vòng Mới</button></div>)}
              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
                 {students.map(student => {
-                    // Logic hiển thị nút Mic trên thẻ HS
-                    const isChatAllowed = !wallConfig.isLocked || wallConfig.allowedStudentIds.includes(student.id);
+                    // --- SỬA LỖI TẠI ĐÂY: Kiểm tra an toàn cho mảng ---
+                    const allowedList = wallConfig.allowedStudentIds || [];
+                    const isChatAllowed = !wallConfig.isLocked || allowedList.includes(student.id);
                     return (
                         <div key={student.id} className={`relative p-4 rounded-2xl transition-all duration-300 flex flex-col items-center gap-3 group ${getCardColor(student)}`}>
-                            {/* Nút xóa HS */}
                             <button onClick={() => removeStudent(student.id)} className="absolute top-2 right-2 text-slate-300 hover:text-red-500 p-1 rounded-full hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16} /></button>
                             
-                            {/* NÚT BẬT/TẮT CHAT (Chỉ hiện khi tường bị khóa) */}
+                            {/* Chỉ hiện nút Mic khi đã khóa */}
                             {wallConfig.isLocked && (
                                 <button 
                                     onClick={() => toggleStudentChat(student.id)} 
@@ -163,15 +173,9 @@ export const TeacherView: React.FC<Props> = ({ store, onLogout }) => {
             <div className="w-96 bg-white border-l border-slate-200 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300 absolute md:relative right-0 h-full z-30">
                 <div className="p-4 border-b border-slate-100 bg-white">
                     <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-slate-800 flex items-center gap-2"><MessageSquare size={18} className="text-indigo-600"/> Tường Lớp</h3><div className="flex gap-2"><button onClick={handleExportWord} className="text-green-600 bg-green-50 hover:bg-green-100 p-2 rounded-lg" title="Tải file Word"><Download size={18}/></button><button onClick={() => setShowActivityLog(false)} className="md:hidden text-slate-400"><X size={20}/></button></div></div>
-                    {/* Filter Tabs */}
                     <div className="flex gap-1 mb-3 bg-slate-100 p-1 rounded-xl">{['all', 'help', 'finished', 'raised'].map((t) => ( <button key={t} onClick={() => setFilterStatus(t as any)} className={`flex-1 text-[10px] py-1.5 rounded-lg font-bold uppercase transition-all ${filterStatus === t ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>{t === 'all' ? 'Tất cả' : t === 'help' ? 'Cần giúp' : t === 'finished' ? 'Đã xong' : 'Giơ tay'}</button> ))}</div>
                     <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100">
-                        {/* NÚT KHÓA TƯỜNG (Thay nút Công khai cũ hoặc thêm vào cạnh) */}
-                        <button onClick={() => updateWallConfig({ isLocked: !wallConfig.isLocked })} className={`p-2 rounded-xl flex flex-col items-center gap-1 border-2 transition-all font-bold ${wallConfig.isLocked ? 'bg-red-50 border-red-200 text-red-600' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'}`}>
-                             {wallConfig.isLocked ? <Shield size={20} /> : <ShieldOff size={20} />}
-                             {wallConfig.isLocked ? 'Đã Khóa Chat' : 'Cho phép Chat'}
-                        </button>
-                        
+                        <button onClick={() => updateWallConfig({ isLocked: !wallConfig.isLocked })} className={`p-2 rounded-xl flex flex-col items-center gap-1 border-2 transition-all font-bold ${wallConfig.isLocked ? 'bg-red-50 border-red-200 text-red-600' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'}`}> {wallConfig.isLocked ? <Shield size={20} /> : <ShieldOff size={20} />} {wallConfig.isLocked ? 'Đã Khóa Chat' : 'Cho phép Chat'} </button>
                         <button onClick={() => updateWallConfig({ isPublic: !wallConfig.isPublic })} className={`p-2 rounded-xl flex flex-col items-center gap-1 border-2 transition-all font-bold ${wallConfig.isPublic ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'}`}>{wallConfig.isPublic ? <Globe size={20} /> : <Lock size={20} />}{wallConfig.isPublic ? 'Công khai' : 'Riêng tư'}</button>
                     </div>
                     <div className="mt-2 text-xs text-center text-slate-400">
