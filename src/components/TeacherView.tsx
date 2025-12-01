@@ -3,7 +3,7 @@ import { ClassroomState, StudentStatus, WallConfig, UserRole } from '../types';
 import { 
   Users, Hand, CheckCircle, AlertCircle, Bell, RefreshCw, 
   Trash2, MessageSquare, Send, Sparkles, X, Loader2, LogOut, Globe, Eye, EyeOff, Lock, Unlock,
-  Download, Image as ImageIcon, Mic, MicOff, Shield, ShieldOff
+  Download, Image as ImageIcon, Mic, MicOff, Shield, ShieldOff, Printer, FileText
 } from 'lucide-react';
 import { getTeacherAssistantAdvice } from '../services/geminiService';
 
@@ -66,7 +66,6 @@ export const TeacherView: React.FC<Props> = ({ store, onLogout }) => {
   const handleAskAI = async (e: React.FormEvent) => { e.preventDefault(); if (!aiPrompt.trim()) return; setIsAiLoading(true); setAiResponse(null); const advice = await getTeacherAssistantAdvice(aiPrompt, state); setAiResponse(advice); setIsAiLoading(false); };
   const formatTime = (timestamp?: number) => { if (!timestamp) return ''; const diff = Math.floor((Date.now() - timestamp) / 60000); return diff < 1 ? 'Vừa xong' : `${diff} phút trước`; };
 
-  // --- SỬA TÊN NGƯỜI GỬI TẠI ĐÂY ---
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (messageText.trim() || selectedImage) {
@@ -85,13 +84,64 @@ export const TeacherView: React.FC<Props> = ({ store, onLogout }) => {
     }
   };
 
+  // --- CẢI TIẾN: Xuất Word (Cố gắng fix ảnh nhưng vẫn có hạn chế) ---
   const handleExportWord = () => {
-    const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Lịch sử Chat Lớp Học</title></head><body><h1 style="color: #4F46E5">Nhật Ký Tường Lớp Học</h1><p>Ngày xuất: ${new Date().toLocaleString()}</p><hr/>`;
-    const body = messages.map(msg => `<div style="margin-bottom: 15px; padding: 10px; border-bottom: 1px solid #eee;"><p><strong>${msg.senderName}</strong> <span style="color: #888; font-size: 0.8em">(${new Date(msg.timestamp).toLocaleTimeString()})</span></p>${msg.text ? `<p>${msg.text}</p>` : ''}${msg.imageUrl ? `<img src="${msg.imageUrl}" width="300" style="border-radius: 8px; margin-top: 5px;" />` : ''}</div>`).join('');
+    const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Lịch sử Chat</title></head><body><h2 style="color: #4F46E5">Nhật Ký Lớp Học - ClassRoomie</h2><p>Ngày xuất: ${new Date().toLocaleString()}</p><hr/>`;
+    const body = messages.map(msg => `
+      <div style="margin-bottom: 20px; padding: 10px; border-bottom: 1px solid #eee;">
+        <p><strong>${msg.senderName}</strong> <span style="color: #888; font-size: 0.8em">(${new Date(msg.timestamp).toLocaleTimeString()})</span></p>
+        ${msg.text ? `<p style="margin: 5px 0;">${msg.text}</p>` : ''}
+        ${msg.imageUrl ? `<br/><img src="${msg.imageUrl}" width="200" height="auto" alt="Image" style="display: block; margin-top: 10px;" />` : ''}
+      </div>
+    `).join('');
     const footer = "</body></html>";
     const blob = new Blob(['\ufeff', header + body + footer], { type: 'application/msword' });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a'); link.href = url; link.download = `Tuong_Lop_${new Date().toLocaleDateString().replace(/\//g, '-')}.doc`; document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    const link = document.createElement('a'); link.href = url; link.download = `Tuong_Lop_Word_${new Date().toLocaleDateString().replace(/\//g, '-')}.doc`; document.body.appendChild(link); link.click(); document.body.removeChild(link);
+  };
+
+  // --- MỚI: Xuất PDF/In (Giải pháp tối ưu cho HÌNH ẢNH) ---
+  const handlePrintPDF = () => {
+    const printWindow = window.open('', '', 'width=800,height=900');
+    if (!printWindow) return;
+
+    const content = messages.map(msg => `
+      <div class="message">
+        <div class="meta">
+          <span class="name ${msg.role === UserRole.TEACHER ? 'teacher' : ''}">${msg.senderName}</span>
+          <span class="time">${new Date(msg.timestamp).toLocaleTimeString()}</span>
+        </div>
+        ${msg.text ? `<p class="text">${msg.text}</p>` : ''}
+        ${msg.imageUrl ? `<img src="${msg.imageUrl}" class="image" />` : ''}
+      </div>
+    `).join('');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Nhật Ký Tường Lớp (PDF)</title>
+          <style>
+            body { font-family: 'Segoe UI', sans-serif; padding: 20px; max-width: 800px; mx-auto; }
+            h1 { color: #4F46E5; text-align: center; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+            .message { margin-bottom: 15px; padding: 10px; border-radius: 8px; background: #f9fafb; border: 1px solid #e5e7eb; page-break-inside: avoid; }
+            .meta { font-size: 0.85em; margin-bottom: 5px; }
+            .name { font-weight: bold; color: #374151; }
+            .name.teacher { color: #7c3aed; }
+            .time { color: #9ca3af; margin-left: 8px; }
+            .text { margin: 5px 0; color: #1f2937; }
+            .image { max-width: 300px; border-radius: 8px; margin-top: 5px; border: 1px solid #ddd; }
+          </style>
+        </head>
+        <body>
+          <h1>Nhật Ký Tường Lớp Học</h1>
+          ${content}
+          <script>
+            window.onload = function() { window.print(); window.close(); }
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const toggleStudentChat = (studentId: string) => {
@@ -150,7 +200,13 @@ export const TeacherView: React.FC<Props> = ({ store, onLogout }) => {
           {showActivityLog && (
             <div className="w-96 bg-white border-l border-slate-200 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300 absolute md:relative right-0 h-full z-30">
                 <div className="p-4 border-b border-slate-100 bg-white">
-                    <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-slate-800 flex items-center gap-2"><MessageSquare size={18} className="text-indigo-600"/> Tường Lớp</h3><div className="flex gap-2"><button onClick={handleExportWord} className="text-green-600 bg-green-50 hover:bg-green-100 p-2 rounded-lg" title="Tải file Word"><Download size={18}/></button><button onClick={() => setShowActivityLog(false)} className="md:hidden text-slate-400"><X size={20}/></button></div></div>
+                    <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-slate-800 flex items-center gap-2"><MessageSquare size={18} className="text-indigo-600"/> Tường Lớp</h3>
+                        <div className="flex gap-1">
+                             <button onClick={handleExportWord} className="text-blue-600 bg-blue-50 hover:bg-blue-100 p-2 rounded-lg transition-colors" title="Xuất file Word (Văn bản)"><FileText size={18}/></button>
+                             <button onClick={handlePrintPDF} className="text-green-600 bg-green-50 hover:bg-green-100 p-2 rounded-lg transition-colors" title="In / Lưu PDF (Có ảnh)"><Printer size={18}/></button>
+                             <button onClick={() => setShowActivityLog(false)} className="md:hidden text-slate-400"><X size={20}/></button>
+                        </div>
+                    </div>
                     <div className="flex gap-1 mb-3 bg-slate-100 p-1 rounded-xl">{['all', 'help', 'finished', 'raised'].map((t) => ( <button key={t} onClick={() => setFilterStatus(t as any)} className={`flex-1 text-[10px] py-1.5 rounded-lg font-bold uppercase transition-all ${filterStatus === t ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>{t === 'all' ? 'Tất cả' : t === 'help' ? 'Cần giúp' : t === 'finished' ? 'Đã xong' : 'Giơ tay'}</button> ))}</div>
                     <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100">
                         <button onClick={() => updateWallConfig({ isLocked: !wallConfig.isLocked })} className={`p-2 rounded-xl flex flex-col items-center gap-1 border-2 transition-all font-bold ${wallConfig.isLocked ? 'bg-red-50 border-red-200 text-red-600' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'}`}> {wallConfig.isLocked ? <Shield size={20} /> : <ShieldOff size={20} />} {wallConfig.isLocked ? 'Đã Khóa Chat' : 'Cho phép Chat'} </button>
@@ -169,7 +225,6 @@ export const TeacherView: React.FC<Props> = ({ store, onLogout }) => {
                         <div key={msg.id} className={`bg-white p-4 rounded-2xl shadow-sm border border-slate-100 animate-in fade-in slide-in-from-bottom-2 ${isTeacher ? 'border-purple-200 bg-purple-50' : ''}`}>
                             <div className="flex justify-between items-start mb-2">
                                 <div className="flex items-center gap-2">
-                                    {/* --- SỬA HIỂN THỊ TÊN TẠI ĐÂY --- */}
                                     <span className={`font-bold text-sm ${isTeacher ? 'text-purple-700' : 'text-indigo-600'}`}>
                                         {isTeacher ? 'Thầy Châu' : wallConfig.showNames ? msg.senderName : 'Bạn giấu tên'}
                                     </span>
