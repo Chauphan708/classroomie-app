@@ -12,12 +12,15 @@ export interface UserSession {
 export interface WallConfig {
   isPublic: boolean;
   showNames: boolean;
+  isLocked: boolean; // <-- MỚI: Trạng thái khóa chat tổng
+  allowedStudentIds: string[]; // <-- MỚI: Danh sách HS được phép chat khi bị khóa
 }
 
 export interface ChatMessage {
   id: string;
   senderId: string;
   senderName: string;
+  role: UserRole;
   text?: string;
   imageUrl?: string;
   timestamp: number;
