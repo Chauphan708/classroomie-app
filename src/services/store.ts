@@ -24,19 +24,22 @@ export const useClassroomStore = create<ClassroomStore>((set, get) => ({
     messages: [],
     buzzerActive: false,
     buzzerWinnerId: null,
-    // CẬP NHẬT INIT STATE
     wallConfig: { 
         isPublic: true, 
         showNames: true, 
-        isLocked: false, // Mặc định mở
-        allowedStudentIds: [] // Danh sách trống
+        isLocked: false, 
+        allowedStudentIds: [] 
     },
   },
   channel: null,
 
   connectToRoom: (user) => {
-    if (get().channel) get().channel?.unsubscribe();
+    // 1. Ngắt kết nối cũ nếu có để tránh trùng lặp
+    if (get().channel) {
+        supabase.removeChannel(get().channel as RealtimeChannel);
+    }
 
+    // 2. Tạo kênh kết nối
     const channel = supabase.channel('classroom-room-1', {
       config: { presence: { key: user.id } },
     });
@@ -45,14 +48,20 @@ export const useClassroomStore = create<ClassroomStore>((set, get) => ({
       .on('presence', { event: 'sync' }, () => {
         const newState = channel.presenceState();
         const studentsMap: Record<string, StudentStatus> = {};
+        
+        console.log("📡 Dữ liệu Presence nhận được:", newState); // Kiểm tra xem có nhận được dữ liệu không
+
         Object.values(newState).forEach((presences: any) => {
           const userData = presences[0];
-          if (userData && userData.role === UserRole.STUDENT) {
+          // --- SỬA LỖI TẠI ĐÂY: NỚI LỎNG ĐIỀU KIỆN ---
+          // Chỉ cần có ID, Name và KHÔNG PHẢI là Giáo viên thì đều coi là Học sinh
+          if (userData && userData.id && userData.name && userData.role !== UserRole.TEACHER) {
             studentsMap[userData.id] = userData as StudentStatus;
           }
         });
         set((s) => ({ state: { ...s.state, students: studentsMap } }));
       })
+      // ... (Các phần lắng nghe broadcast giữ nguyên) ...
       .on('broadcast', { event: 'control' }, ({ payload }) => {
          if (payload.type === 'RESET_BUZZER') set((s) => ({ state: { ...s.state, buzzerWinnerId: null, buzzerActive: true } }));
          if (payload.type === 'LOCK_BUZZER') set((s) => ({ state: { ...s.state, buzzerActive: false } }));
@@ -63,7 +72,6 @@ export const useClassroomStore = create<ClassroomStore>((set, get) => ({
              }, {} as any);
              set((s) => ({ state: { ...s.state, students: resetStudents, buzzerWinnerId: null, buzzerActive: false } }));
          }
-         // Cập nhật cấu hình tường (bao gồm khóa/mở chat)
          if (payload.type === 'UPDATE_WALL') {
              set((s) => ({ state: { ...s.state, wallConfig: payload.config } }));
          }
@@ -82,17 +90,29 @@ export const useClassroomStore = create<ClassroomStore>((set, get) => ({
           }
       });
 
+    // 3. Kích hoạt kết nối và gửi thông tin bản thân lên
     channel.subscribe(async (status) => {
+      console.log("🔌 Trạng thái kết nối:", status); // Kiểm tra xem có Connected không
+      
       if (status === 'SUBSCRIBED') {
         if (user.role === UserRole.STUDENT) {
             const initialStatus: StudentStatus = {
-                id: user.id, name: user.name, role: user.role, group: user.group,
-                avatarSeed: user.id, needsHelp: false, isFinished: false, handRaised: false,
+                id: user.id, 
+                name: user.name, 
+                role: user.role, // Quan trọng
+                group: user.group,
+                avatarSeed: user.id, 
+                needsHelp: false, 
+                isFinished: false, 
+                handRaised: false,
             } as any;
+            
+            // Gửi thông tin của mình lên mạng để mọi người (và chính mình) nhìn thấy
             await channel.track(initialStatus);
         }
       }
     });
+
     set({ channel });
   },
 
