@@ -8,7 +8,7 @@ interface ClassroomStore {
   channel: RealtimeChannel | null;
   
   // Actions
-  connectToRoom: (user: { id: string; name: string; role: UserRole; group?: string }) => void;
+  connectToRoom: (user: { id: string; name: string; role: UserRole; group?: string }, roomId: string) => void;
   updateStudentStatus: (id: string, updates: Partial<StudentStatus>) => void;
   removeStudent: (id: string) => void;
   sendMessage: (senderId: string, senderName: string, role: UserRole, text?: string, imageUrl?: string) => void;
@@ -30,17 +30,18 @@ export const useClassroomStore = create<ClassroomStore>((set, get) => ({
         isLocked: false, 
         allowedStudentIds: [] 
     },
+    teacherPresent: false,
   },
   channel: null,
 
-  connectToRoom: (user) => {
-    // 1. Ngắt kết nối cũ nếu có để tránh trùng lặp
-    if (get().channel) {
-        supabase.removeChannel(get().channel as RealtimeChannel);
-    }
+  connectToRoom: (user, roomId) => {
+    // 1. Ngắt kết nối cũ
+    if (get().channel) supabase.removeChannel(get().channel as RealtimeChannel);
 
-    // 2. Tạo kênh kết nối
-    const channel = supabase.channel('classroom-room-1', {
+    // 2. Tạo kênh riêng theo Mã Phòng (roomId)
+    // Chuyển mã về chữ thường, bỏ khoảng trắng để đồng bộ (VD: "5A2 " -> "5a2")
+    const cleanRoomId = roomId.trim().toLowerCase();
+    const channel = supabase.channel(`classroom-room-${cleanRoomId}`, {
       config: { presence: { key: user.id } },
     });
 
@@ -48,20 +49,34 @@ export const useClassroomStore = create<ClassroomStore>((set, get) => ({
       .on('presence', { event: 'sync' }, () => {
         const newState = channel.presenceState();
         const studentsMap: Record<string, StudentStatus> = {};
-        
-        console.log("📡 Dữ liệu Presence nhận được:", newState); // Kiểm tra xem có nhận được dữ liệu không
+        let isTeacherHere = false;
+
+        console.log(`📡 Phòng [${cleanRoomId}] - Dữ liệu:`, newState);
 
         Object.values(newState).forEach((presences: any) => {
           const userData = presences[0];
-          // --- SỬA LỖI TẠI ĐÂY: NỚI LỎNG ĐIỀU KIỆN ---
-          // Chỉ cần có ID, Name và KHÔNG PHẢI là Giáo viên thì đều coi là Học sinh
-          if (userData && userData.id && userData.name && userData.role !== UserRole.TEACHER) {
+          if (!userData) return;
+
+          // Kiểm tra xem có Giáo viên trong phòng không
+          if (userData.role === UserRole.TEACHER) {
+            isTeacherHere = true;
+          }
+          // Lấy danh sách học sinh (có ID và Tên)
+          else if (userData.id && userData.name) {
             studentsMap[userData.id] = userData as StudentStatus;
           }
         });
-        set((s) => ({ state: { ...s.state, students: studentsMap } }));
+
+        // Cập nhật State: Danh sách HS và Trạng thái Giáo viên
+        set((s) => ({ 
+            state: { 
+                ...s.state, 
+                students: studentsMap,
+                teacherPresent: isTeacherHere
+            } 
+        }));
       })
-      // ... (Các phần lắng nghe broadcast giữ nguyên) ...
+      // Các sự kiện Broadcast (Giữ nguyên logic cũ)
       .on('broadcast', { event: 'control' }, ({ payload }) => {
          if (payload.type === 'RESET_BUZZER') set((s) => ({ state: { ...s.state, buzzerWinnerId: null, buzzerActive: true } }));
          if (payload.type === 'LOCK_BUZZER') set((s) => ({ state: { ...s.state, buzzerActive: false } }));
@@ -72,9 +87,7 @@ export const useClassroomStore = create<ClassroomStore>((set, get) => ({
              }, {} as any);
              set((s) => ({ state: { ...s.state, students: resetStudents, buzzerWinnerId: null, buzzerActive: false } }));
          }
-         if (payload.type === 'UPDATE_WALL') {
-             set((s) => ({ state: { ...s.state, wallConfig: payload.config } }));
-         }
+         if (payload.type === 'UPDATE_WALL') set((s) => ({ state: { ...s.state, wallConfig: payload.config } }));
          if (payload.type === 'REMOVE_STUDENT') {
              const { [payload.id]: _, ...rest } = get().state.students;
              set((s) => ({ state: { ...s.state, students: rest } }));
@@ -90,26 +103,21 @@ export const useClassroomStore = create<ClassroomStore>((set, get) => ({
           }
       });
 
-    // 3. Kích hoạt kết nối và gửi thông tin bản thân lên
+    // 3. Kích hoạt và Gửi thông tin định danh
     channel.subscribe(async (status) => {
-      console.log("🔌 Trạng thái kết nối:", status); // Kiểm tra xem có Connected không
+      console.log(`🔌 Kết nối phòng [${cleanRoomId}]:`, status);
       
       if (status === 'SUBSCRIBED') {
-        if (user.role === UserRole.STUDENT) {
-            const initialStatus: StudentStatus = {
-                id: user.id, 
-                name: user.name, 
-                role: user.role, // Quan trọng
-                group: user.group,
-                avatarSeed: user.id, 
-                needsHelp: false, 
-                isFinished: false, 
-                handRaised: false,
-            } as any;
-            
-            // Gửi thông tin của mình lên mạng để mọi người (và chính mình) nhìn thấy
-            await channel.track(initialStatus);
-        }
+        const myInfo = {
+            id: user.id,
+            name: user.name,
+            role: user.role,
+            group: user.group,
+            avatarSeed: user.id,
+            // Các trạng thái mặc định
+            needsHelp: false, isFinished: false, handRaised: false
+        };
+        await channel.track(myInfo);
       }
     });
 

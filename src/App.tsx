@@ -5,25 +5,25 @@ import { TeacherView } from './components/TeacherView';
 import { useClassroomStore } from './services/store';
 import { UserRole, UserSession } from './types';
 
-// Hàm tạo ID ngẫu nhiên
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
 export default function App() {
   const [session, setSession] = useState<UserSession | null>(null);
   const store = useClassroomStore();
 
-  const handleJoin = (name: string, role: UserRole, group?: string) => {
+  const handleJoin = (name: string, role: UserRole, roomId: string, group?: string) => {
     const id = generateId();
-    const newSession = { id, name, role };
+    // Lưu roomId vào session để dùng về sau
+    const newSession = { id, name, role, roomId }; 
     setSession(newSession);
     
-    // SỬA LẠI DÒNG NÀY: Dùng connectToRoom thay vì joinClass
+    // Gọi hàm connectToRoom với đầy đủ 2 tham số: user + roomId
     store.connectToRoom({ 
       id, 
       name, 
       role, 
       group: role === UserRole.STUDENT ? group : undefined 
-    });
+    }, roomId);
   };
 
   const handleLogout = () => {

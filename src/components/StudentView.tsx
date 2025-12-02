@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { UserSession, StudentStatus, ClassroomState, UserRole } from '../types';
-import { Hand, CheckCircle, AlertCircle, Bell, Send, Image as ImageIcon, X, LogOut, EyeOff, Lock } from 'lucide-react';
+import { Hand, CheckCircle, AlertCircle, Bell, Send, Image as ImageIcon, X, LogOut, EyeOff, Lock, User } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface Props {
@@ -36,6 +36,31 @@ export const StudentView: React.FC<Props> = ({ session, store, onLogout }) => {
   useEffect(() => { if (isBuzzerWinner) { const fire = (confetti as any).default || confetti; fire({ particleCount: 200, spread: 100, origin: { y: 0.6 }, ticks: 300 }); } }, [isBuzzerWinner]);
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length, wallConfig?.isPublic]);
 
+  // --- MÀN HÌNH CHỜ GIÁO VIÊN ---
+  // Nếu đã kết nối (myStatus có) NHƯNG chưa thấy GV (teacherPresent = false)
+  if (myStatus && !state.teacherPresent) {
+      return (
+        <div className="flex flex-col items-center justify-center h-screen bg-slate-50 text-center p-6 space-y-6 font-sans">
+            <div className="relative">
+                <div className="w-24 h-24 border-4 border-slate-200 rounded-full"></div>
+                <div className="w-24 h-24 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <User className="text-indigo-500" size={36} /> 
+                </div>
+            </div>
+            <div>
+                <h2 className="text-2xl font-bold text-slate-700">Đang tìm phòng {session.roomId}...</h2>
+                <p className="text-slate-500 mt-2 font-medium">Vui lòng đợi Thầy Châu mở phòng hoặc kiểm tra lại Mã lớp.</p>
+                <div className="mt-4 p-3 bg-blue-50 text-blue-700 text-sm rounded-xl inline-block border border-blue-100">
+                    Trạng thái: <strong>Đang chờ tín hiệu...</strong>
+                </div>
+            </div>
+            <button onClick={onLogout} className="px-8 py-3 bg-white border-2 border-slate-200 rounded-xl text-slate-600 font-bold hover:bg-slate-100 hover:border-slate-300 transition-colors shadow-sm">Quay lại</button>
+        </div>
+      );
+  }
+
+  // Màn hình loading khi chưa kết nối
   if (!myStatus) { return ( <div className="flex flex-col items-center justify-center h-screen bg-slate-50 text-slate-500 gap-4"><div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div><p className="font-bold animate-pulse">Đang kết nối vào lớp...</p></div> ); }
 
   const toggleStatus = (key: keyof StudentStatus) => { // @ts-ignore
@@ -69,19 +94,8 @@ export const StudentView: React.FC<Props> = ({ session, store, onLogout }) => {
              {visibleMessages.map(msg => { const isMe = msg.senderId === session.id; const isTeacher = msg.role === UserRole.TEACHER; const showName = isMe || isTeacher || wallConfig?.showNames; return ( <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}> <div className={`max-w-[85%] rounded-2xl p-3 shadow-sm ${isTeacher ? 'bg-purple-600 text-white rounded-bl-none shadow-md border-2 border-purple-200' : isMe ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-br-none' : 'bg-white border border-slate-100 rounded-bl-none text-slate-700'}`}> <div className={`text-[10px] font-bold mb-1 ${isTeacher ? 'text-yellow-300' : isMe ? 'text-indigo-200' : 'text-slate-400'} flex items-center gap-1 uppercase tracking-wide`}> {showName ? (isTeacher ? 'Thầy Châu' : msg.senderName) : 'Bạn bí ẩn'} {!showName && <EyeOff size={10} />} {isTeacher && <span className="ml-1 bg-yellow-400 text-purple-900 px-1 rounded text-[8px]">GV</span>}</div> {msg.imageUrl && ( <img src={msg.imageUrl} alt="post" className="rounded-lg mb-2 max-h-40 object-cover w-full border border-black/10" /> )} {msg.text && <p className="text-sm font-medium">{msg.text}</p>} </div> </div> ); })}
              <div ref={messagesEndRef} />
           </div>
-          
           <div className="p-3 border-t border-slate-100 bg-white">
-             {canPost ? (
-                 <>
-                     {selectedImage && (<div className="relative mb-2 inline-block"><img src={selectedImage} alt="Preview" className="h-16 w-auto rounded-xl border-2 border-slate-200 shadow-sm" /><button onClick={() => setSelectedImage(null)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600"><X size={12} /></button></div>)}
-                     <form onSubmit={handleSend} className="flex gap-2"> <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 text-slate-400 bg-slate-100 rounded-2xl hover:bg-indigo-50 hover:text-indigo-500 transition-colors"><ImageIcon size={24} /></button> <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageSelect} /> <input type="text" value={messageText} onChange={(e) => setMessageText(e.target.value)} placeholder="Nhập tin nhắn..." className="flex-1 bg-slate-100 px-4 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/50 font-medium text-slate-700 transition-all focus:bg-white border border-transparent focus:border-indigo-200" /> <button type="submit" disabled={!messageText.trim() && !selectedImage} className="bg-indigo-600 text-white p-3 rounded-2xl disabled:opacity-50 disabled:shadow-none hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 active:scale-95"><Send size={24} /></button> </form>
-                 </>
-             ) : (
-                 <div className="p-3 text-center bg-slate-50 rounded-xl border-2 border-dashed border-slate-200 text-slate-400 font-bold text-sm">
-                     <Lock size={16} className="inline-block mr-1 mb-0.5" />
-                     Giáo viên đang khóa trò chuyện
-                 </div>
-             )}
+             {canPost ? (<> {selectedImage && (<div className="relative mb-2 inline-block"><img src={selectedImage} alt="Preview" className="h-16 w-auto rounded-xl border-2 border-slate-200 shadow-sm" /><button onClick={() => setSelectedImage(null)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600"><X size={12} /></button></div>)} <form onSubmit={handleSend} className="flex gap-2"> <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 text-slate-400 bg-slate-100 rounded-2xl hover:bg-indigo-50 hover:text-indigo-500 transition-colors"><ImageIcon size={24} /></button> <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageSelect} /> <input type="text" value={messageText} onChange={(e) => setMessageText(e.target.value)} placeholder="Nhập tin nhắn..." className="flex-1 bg-slate-100 px-4 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/50 font-medium text-slate-700 transition-all focus:bg-white border border-transparent focus:border-indigo-200" /> <button type="submit" disabled={!messageText.trim() && !selectedImage} className="bg-indigo-600 text-white p-3 rounded-2xl disabled:opacity-50 disabled:shadow-none hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 active:scale-95"><Send size={24} /></button> </form> </>) : (<div className="p-3 text-center bg-slate-50 rounded-xl border-2 border-dashed border-slate-200 text-slate-400 font-bold text-sm"><Lock size={16} className="inline-block mr-1 mb-0.5" /> Giáo viên đang khóa trò chuyện</div>)}
           </div>
         </div>
       </main>

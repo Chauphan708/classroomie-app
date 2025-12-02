@@ -7,13 +7,14 @@ export interface UserSession {
   id: string;
   name: string;
   role: UserRole;
+  roomId: string; // Mã phòng học
 }
 
 export interface WallConfig {
   isPublic: boolean;
   showNames: boolean;
-  isLocked: boolean; // <-- MỚI: Trạng thái khóa chat tổng
-  allowedStudentIds: string[]; // <-- MỚI: Danh sách HS được phép chat khi bị khóa
+  isLocked: boolean;
+  allowedStudentIds: string[];
 }
 
 export interface ChatMessage {
@@ -46,4 +47,5 @@ export interface ClassroomState {
   buzzerActive: boolean;
   buzzerWinnerId: string | null;
   wallConfig: WallConfig;
+  teacherPresent: boolean; // Trạng thái: Giáo viên đã vào lớp chưa
 }
