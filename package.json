@@ -15,6 +15,7 @@
     "@supabase/supabase-js": "^2.84.0",
     "canvas-confetti": "^1.9.4",
     "lucide-react": "^0.554.0",
+    "qrcode.react": "^4.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "zustand": "^5.0.8"
@@ -24,6 +25,7 @@
     "@tailwindcss/postcss": "^4.0.0",
     "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^24.10.1",
+    "@types/qrcode.react": "^1.0.5",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
