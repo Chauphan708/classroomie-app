@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ClassroomState, StudentStatus, WallConfig, UserRole } from '../types';
+import { ClassroomState, StudentStatus, WallConfig, UserRole, UserSession } from '../types';
 import { 
   Users, Hand, CheckCircle, AlertCircle, Bell, RefreshCw, 
   Trash2, MessageSquare, Send, Sparkles, X, Loader2, LogOut, Globe, Eye, EyeOff, Lock, Unlock,
-  Download, Image as ImageIcon, Mic, MicOff, Shield, ShieldOff, Printer, FileText
+  Download, Image as ImageIcon, Mic, MicOff, Shield, ShieldOff, Printer, FileText, QrCode, Copy, Maximize
 } from 'lucide-react';
 import { getTeacherAssistantAdvice } from '../services/geminiService';
+import { QRCodeSVG } from 'qrcode.react'; // Thư viện QR mới cài
 
 interface Props {
+  session: UserSession; // Thêm session để lấy RoomId
   store: {
     state: ClassroomState;
     updateWallConfig: (config: Partial<WallConfig>) => void;
@@ -28,7 +30,7 @@ const SOUNDS = {
   buzzer: 'https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3',
 };
 
-export const TeacherView: React.FC<Props> = ({ store, onLogout }) => {
+export const TeacherView: React.FC<Props> = ({ session, store, onLogout }) => {
   const { state, updateWallConfig, resetBuzzer, lockBuzzer, resetAllStatuses, removeStudent, sendMessage } = store;
   const students: StudentStatus[] = Object.values(state.students);
   const messages = state.messages;
@@ -44,6 +46,10 @@ export const TeacherView: React.FC<Props> = ({ store, onLogout }) => {
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [showAiModal, setShowAiModal] = useState(false);
+  
+  // STATE MỚI CHO POPUP KẾT NỐI
+  const [showConnectionModal, setShowConnectionModal] = useState(false);
+  
   const [showActivityLog, setShowActivityLog] = useState(true);
   const [filterStatus, setFilterStatus] = useState<'all' | 'help' | 'finished' | 'raised'>('all');
   const [filterStudentId, setFilterStudentId] = useState<string>('all');
@@ -61,7 +67,6 @@ export const TeacherView: React.FC<Props> = ({ store, onLogout }) => {
   };
   
   useEffect(() => { if (showActivityLog) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, showActivityLog, filterStatus, filterStudentId, wallConfig?.isPublic]);
-  
   useEffect(() => { const prevStudents = prevStudentsRef.current; students.forEach(s => { const prev = prevStudents[s.id]; if (!prev) return; if (s.needsHelp && !prev.needsHelp) playSound('alert'); else if (s.handRaised && !prev.handRaised) playSound('hand'); else if (s.isFinished && !prev.isFinished) playSound('success'); }); if (messages.length > prevMessagesLengthRef.current && prevMessagesLengthRef.current > 0) playSound('message'); if (state.buzzerWinnerId && state.buzzerWinnerId !== prevWinnerRef.current) { playSound('buzzer'); } prevStudentsRef.current = { ...state.students }; prevMessagesLengthRef.current = messages.length; prevWinnerRef.current = state.buzzerWinnerId; }, [state.students, messages, state.buzzerWinnerId]);
   const handleAskAI = async (e: React.FormEvent) => { e.preventDefault(); if (!aiPrompt.trim()) return; setIsAiLoading(true); setAiResponse(null); const advice = await getTeacherAssistantAdvice(aiPrompt, state); setAiResponse(advice); setIsAiLoading(false); };
   const formatTime = (timestamp?: number) => { if (!timestamp) return ''; const diff = Math.floor((Date.now() - timestamp) / 60000); return diff < 1 ? 'Vừa xong' : `${diff} phút trước`; };
@@ -75,90 +80,18 @@ export const TeacherView: React.FC<Props> = ({ store, onLogout }) => {
     }
   };
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => { const img = new Image(); img.src = reader.result as string; img.onload = () => { const canvas = document.createElement('canvas'); const MAX_WIDTH = 500; const scaleSize = MAX_WIDTH / img.width; canvas.width = MAX_WIDTH; canvas.height = img.height * scaleSize; const ctx = canvas.getContext('2d'); ctx?.drawImage(img, 0, 0, canvas.width, canvas.height); setSelectedImage(canvas.toDataURL('image/jpeg', 0.8)); }; };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  // --- CẢI TIẾN: Xuất Word (Cố gắng fix ảnh nhưng vẫn có hạn chế) ---
-  const handleExportWord = () => {
-    const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Lịch sử Chat</title></head><body><h2 style="color: #4F46E5">Nhật Ký Lớp Học - ClassRoomie</h2><p>Ngày xuất: ${new Date().toLocaleString()}</p><hr/>`;
-    const body = messages.map(msg => `
-      <div style="margin-bottom: 20px; padding: 10px; border-bottom: 1px solid #eee;">
-        <p><strong>${msg.senderName}</strong> <span style="color: #888; font-size: 0.8em">(${new Date(msg.timestamp).toLocaleTimeString()})</span></p>
-        ${msg.text ? `<p style="margin: 5px 0;">${msg.text}</p>` : ''}
-        ${msg.imageUrl ? `<br/><img src="${msg.imageUrl}" width="200" height="auto" alt="Image" style="display: block; margin-top: 10px;" />` : ''}
-      </div>
-    `).join('');
-    const footer = "</body></html>";
-    const blob = new Blob(['\ufeff', header + body + footer], { type: 'application/msword' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a'); link.href = url; link.download = `Tuong_Lop_Word_${new Date().toLocaleDateString().replace(/\//g, '-')}.doc`; document.body.appendChild(link); link.click(); document.body.removeChild(link);
-  };
-
-  // --- MỚI: Xuất PDF/In (Giải pháp tối ưu cho HÌNH ẢNH) ---
-  const handlePrintPDF = () => {
-    const printWindow = window.open('', '', 'width=800,height=900');
-    if (!printWindow) return;
-
-    const content = messages.map(msg => `
-      <div class="message">
-        <div class="meta">
-          <span class="name ${msg.role === UserRole.TEACHER ? 'teacher' : ''}">${msg.senderName}</span>
-          <span class="time">${new Date(msg.timestamp).toLocaleTimeString()}</span>
-        </div>
-        ${msg.text ? `<p class="text">${msg.text}</p>` : ''}
-        ${msg.imageUrl ? `<img src="${msg.imageUrl}" class="image" />` : ''}
-      </div>
-    `).join('');
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Nhật Ký Tường Lớp (PDF)</title>
-          <style>
-            body { font-family: 'Segoe UI', sans-serif; padding: 20px; max-width: 800px; mx-auto; }
-            h1 { color: #4F46E5; text-align: center; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-            .message { margin-bottom: 15px; padding: 10px; border-radius: 8px; background: #f9fafb; border: 1px solid #e5e7eb; page-break-inside: avoid; }
-            .meta { font-size: 0.85em; margin-bottom: 5px; }
-            .name { font-weight: bold; color: #374151; }
-            .name.teacher { color: #7c3aed; }
-            .time { color: #9ca3af; margin-left: 8px; }
-            .text { margin: 5px 0; color: #1f2937; }
-            .image { max-width: 300px; border-radius: 8px; margin-top: 5px; border: 1px solid #ddd; }
-          </style>
-        </head>
-        <body>
-          <h1>Nhật Ký Tường Lớp Học</h1>
-          ${content}
-          <script>
-            window.onload = function() { window.print(); window.close(); }
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-  };
-
-  const toggleStudentChat = (studentId: string) => {
-     let newAllowed = [...(wallConfig.allowedStudentIds || [])];
-     if (newAllowed.includes(studentId)) {
-        newAllowed = newAllowed.filter(id => id !== studentId);
-     } else {
-        newAllowed.push(studentId);
-     }
-     updateWallConfig({ allowedStudentIds: newAllowed });
-  };
-
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => { const img = new Image(); img.src = reader.result as string; img.onload = () => { const canvas = document.createElement('canvas'); const MAX_WIDTH = 500; const scaleSize = MAX_WIDTH / img.width; canvas.width = MAX_WIDTH; canvas.height = img.height * scaleSize; const ctx = canvas.getContext('2d'); ctx?.drawImage(img, 0, 0, canvas.width, canvas.height); setSelectedImage(canvas.toDataURL('image/jpeg', 0.8)); }; }; reader.readAsDataURL(file); } };
+  const handleExportWord = () => { const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Lịch sử Chat</title></head><body><h2 style="color: #4F46E5">Nhật Ký Lớp Học - ClassRoomie</h2><p>Ngày xuất: ${new Date().toLocaleString()}</p><hr/>`; const body = messages.map(msg => `<div style="margin-bottom: 20px; padding: 10px; border-bottom: 1px solid #eee;"><p><strong>${msg.senderName}</strong> <span style="color: #888; font-size: 0.8em">(${new Date(msg.timestamp).toLocaleTimeString()})</span></p>${msg.text ? `<p style="margin: 5px 0;">${msg.text}</p>` : ''}${msg.imageUrl ? `<br/><img src="${msg.imageUrl}" width="200" height="auto" alt="Image" style="display: block; margin-top: 10px;" />` : ''}</div>`).join(''); const footer = "</body></html>"; const blob = new Blob(['\ufeff', header + body + footer], { type: 'application/msword' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `Tuong_Lop_Word_${new Date().toLocaleDateString().replace(/\//g, '-')}.doc`; document.body.appendChild(link); link.click(); document.body.removeChild(link); };
+  const handlePrintPDF = () => { const printWindow = window.open('', '', 'width=800,height=900'); if (!printWindow) return; const content = messages.map(msg => `<div class="message"><div class="meta"><span class="name ${msg.role === UserRole.TEACHER ? 'teacher' : ''}">${msg.senderName}</span><span class="time">${new Date(msg.timestamp).toLocaleTimeString()}</span></div>${msg.text ? `<p class="text">${msg.text}</p>` : ''}${msg.imageUrl ? `<img src="${msg.imageUrl}" class="image" />` : ''}</div>`).join(''); printWindow.document.write(`<html><head><title>Nhật Ký Tường Lớp (PDF)</title><style>body { font-family: 'Segoe UI', sans-serif; padding: 20px; max-width: 800px; mx-auto; } h1 { color: #4F46E5; text-align: center; border-bottom: 2px solid #eee; padding-bottom: 10px; } .message { margin-bottom: 15px; padding: 10px; border-radius: 8px; background: #f9fafb; border: 1px solid #e5e7eb; page-break-inside: avoid; } .meta { font-size: 0.85em; margin-bottom: 5px; } .name { font-weight: bold; color: #374151; } .name.teacher { color: #7c3aed; } .time { color: #9ca3af; margin-left: 8px; } .text { margin: 5px 0; color: #1f2937; } .image { max-width: 300px; border-radius: 8px; margin-top: 5px; border: 1px solid #ddd; }</style></head><body><h1>Nhật Ký Tường Lớp Học</h1>${content}<script>window.onload = function() { window.print(); window.close(); }</script></body></html>`); printWindow.document.close(); };
+  const toggleStudentChat = (studentId: string) => { let newAllowed = [...(wallConfig.allowedStudentIds || [])]; if (newAllowed.includes(studentId)) { newAllowed = newAllowed.filter(id => id !== studentId); } else { newAllowed.push(studentId); } updateWallConfig({ allowedStudentIds: newAllowed }); };
   const filteredMessages = messages.filter(msg => { if (filterStudentId !== 'all' && msg.senderId !== filterStudentId) return false; const sender = state.students[msg.senderId]; if (sender) { if (filterStatus === 'help' && !sender.needsHelp) return false; if (filterStatus === 'finished' && !sender.isFinished) return false; if (filterStatus === 'raised' && !sender.handRaised) return false; } return true; });
   const getCardColor = (s: StudentStatus) => { if (state.buzzerWinnerId === s.id) return 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-300 transform scale-105 ring-4 ring-yellow-400'; if (s.needsHelp) return 'bg-white border-l-4 border-red-500 shadow-md animate-pulse'; if (s.handRaised) return 'bg-white border-l-4 border-yellow-400 shadow-md'; if (s.isFinished) return 'bg-white border-l-4 border-green-500 shadow-md'; return 'bg-white border border-gray-100 hover:border-purple-200 hover:shadow-md'; };
 
+  // --- TẠO LINK KẾT NỐI ---
+  const joinUrl = `${window.location.origin}/?room=${session.roomId}`;
+
   return (
-    <div className="h-screen bg-slate-50 flex flex-col md:flex-row overflow-hidden font-sans">
+    <div className="h-screen bg-slate-50 flex flex-col md:flex-row overflow-hidden font-sans relative">
       <aside className="bg-white w-full md:w-72 flex-shrink-0 border-r border-slate-200 shadow-sm flex flex-col z-20">
         <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-purple-50 to-white">
            <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-indigo-600 flex items-center gap-2"><Users className="w-8 h-8 text-purple-600" /> Lớp Học</h1>
@@ -166,6 +99,7 @@ export const TeacherView: React.FC<Props> = ({ store, onLogout }) => {
         </div>
         <nav className="p-4 space-y-3 flex-1 overflow-y-auto">
              <div className="space-y-2">
+                 <button onClick={() => setShowConnectionModal(true)} className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-white bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 rounded-xl transition-all shadow-lg shadow-green-200"><QrCode size={18} /> Mời Tham Gia</button>
                  {state.buzzerActive ? (<button onClick={lockBuzzer} className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-white bg-red-500 hover:bg-red-600 rounded-xl transition-all shadow-md animate-pulse"><Lock size={18} /> Khóa Chuông</button>) : (<button onClick={resetBuzzer} className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-xl transition-all shadow-sm"><Unlock size={18} /> Mở Chuông Mới</button>)}
                  <button onClick={resetAllStatuses} className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all shadow-sm"><RefreshCw size={18} /> Reset Trạng thái</button>
                  <button onClick={() => setShowActivityLog(!showActivityLog)} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-bold rounded-xl transition-all shadow-sm border ${showActivityLog ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}><MessageSquare size={18} /> Tường lớp {messages.length > 0 && <span className="ml-auto bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">{messages.length}</span>}</button>
@@ -199,61 +133,66 @@ export const TeacherView: React.FC<Props> = ({ store, onLogout }) => {
 
           {showActivityLog && (
             <div className="w-96 bg-white border-l border-slate-200 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300 absolute md:relative right-0 h-full z-30">
-                <div className="p-4 border-b border-slate-100 bg-white">
-                    <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-slate-800 flex items-center gap-2"><MessageSquare size={18} className="text-indigo-600"/> Tường Lớp</h3>
-                        <div className="flex gap-1">
-                             <button onClick={handleExportWord} className="text-blue-600 bg-blue-50 hover:bg-blue-100 p-2 rounded-lg transition-colors" title="Xuất file Word (Văn bản)"><FileText size={18}/></button>
-                             <button onClick={handlePrintPDF} className="text-green-600 bg-green-50 hover:bg-green-100 p-2 rounded-lg transition-colors" title="In / Lưu PDF (Có ảnh)"><Printer size={18}/></button>
-                             <button onClick={() => setShowActivityLog(false)} className="md:hidden text-slate-400"><X size={20}/></button>
-                        </div>
-                    </div>
-                    <div className="flex gap-1 mb-3 bg-slate-100 p-1 rounded-xl">{['all', 'help', 'finished', 'raised'].map((t) => ( <button key={t} onClick={() => setFilterStatus(t as any)} className={`flex-1 text-[10px] py-1.5 rounded-lg font-bold uppercase transition-all ${filterStatus === t ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>{t === 'all' ? 'Tất cả' : t === 'help' ? 'Cần giúp' : t === 'finished' ? 'Đã xong' : 'Giơ tay'}</button> ))}</div>
-                    <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100">
-                        <button onClick={() => updateWallConfig({ isLocked: !wallConfig.isLocked })} className={`p-2 rounded-xl flex flex-col items-center gap-1 border-2 transition-all font-bold ${wallConfig.isLocked ? 'bg-red-50 border-red-200 text-red-600' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'}`}> {wallConfig.isLocked ? <Shield size={20} /> : <ShieldOff size={20} />} {wallConfig.isLocked ? 'Đã Khóa Chat' : 'Cho phép Chat'} </button>
-                        <button onClick={() => updateWallConfig({ isPublic: !wallConfig.isPublic })} className={`p-2 rounded-xl flex flex-col items-center gap-1 border-2 transition-all font-bold ${wallConfig.isPublic ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'}`}>{wallConfig.isPublic ? <Globe size={20} /> : <Lock size={20} />}{wallConfig.isPublic ? 'Công khai' : 'Riêng tư'}</button>
-                    </div>
-                    <div className="mt-2 text-xs text-center text-slate-400">
-                        <button disabled={!wallConfig.isPublic} onClick={() => updateWallConfig({ showNames: !wallConfig.showNames })} className={`w-full py-1.5 rounded-lg border flex items-center justify-center gap-1 ${wallConfig.showNames ? 'bg-green-50 border-green-200 text-green-600' : 'bg-white border-slate-200'}`}> {wallConfig.showNames ? <Eye size={12}/> : <EyeOff size={12}/>} {wallConfig.showNames ? 'Hiện tên HS' : 'Ẩn tên HS'} </button>
-                    </div>
-                </div>
-                
-                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
-                    {filteredMessages.length === 0 && <p className="text-center text-slate-400 text-sm font-medium py-10">Chưa có tin nhắn nào</p>}
-                    {filteredMessages.map((msg) => {
-                       const isTeacher = msg.role === UserRole.TEACHER;
-                       return (
-                        <div key={msg.id} className={`bg-white p-4 rounded-2xl shadow-sm border border-slate-100 animate-in fade-in slide-in-from-bottom-2 ${isTeacher ? 'border-purple-200 bg-purple-50' : ''}`}>
-                            <div className="flex justify-between items-start mb-2">
-                                <div className="flex items-center gap-2">
-                                    <span className={`font-bold text-sm ${isTeacher ? 'text-purple-700' : 'text-indigo-600'}`}>
-                                        {isTeacher ? 'Thầy Châu' : wallConfig.showNames ? msg.senderName : 'Bạn giấu tên'}
-                                    </span>
-                                    {isTeacher && <Sparkles size={12} className="text-yellow-500 fill-yellow-500"/>}
-                                    {!wallConfig.showNames && !isTeacher && <EyeOff size={12} className="text-slate-300"/>}
-                                </div>
-                                <span className="text-[10px] text-slate-400 font-medium">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                            </div>
-                            {msg.text && <p className="text-slate-700 text-sm leading-relaxed">{msg.text}</p>}
-                            {msg.imageUrl && (<div className="mt-2 rounded-xl overflow-hidden border border-slate-200"><img src={msg.imageUrl} alt="upload" className="w-full h-auto object-cover" /></div>)}
-                        </div>
-                       );
-                    })}
-                    <div ref={messagesEndRef} />
-                </div>
-                
-                <div className="p-3 border-t border-slate-100 bg-white">
-                     {selectedImage && (<div className="relative mb-2 inline-block"><img src={selectedImage} alt="Preview" className="h-16 w-auto rounded-xl border-2 border-slate-200 shadow-sm" /><button onClick={() => setSelectedImage(null)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600"><X size={12} /></button></div>)}
-                     <form onSubmit={handleSend} className="flex gap-2"> 
-                         <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 text-slate-400 bg-slate-100 rounded-2xl hover:bg-purple-50 hover:text-purple-600 transition-colors"><ImageIcon size={24} /></button> 
-                         <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageSelect} /> 
-                         <input type="text" value={messageText} onChange={(e) => setMessageText(e.target.value)} placeholder="Nhắn cả lớp..." className="flex-1 bg-slate-100 px-4 rounded-2xl outline-none focus:ring-2 focus:ring-purple-500/50 font-medium text-slate-700 transition-all focus:bg-white border border-transparent focus:border-purple-200" /> 
-                         <button type="submit" disabled={!messageText.trim() && !selectedImage} className="bg-purple-600 text-white p-3 rounded-2xl disabled:opacity-50 hover:bg-purple-700 transition-all shadow-lg shadow-purple-200 active:scale-95"><Send size={24} /></button> 
-                    </form>
-                </div>
+                <div className="p-4 border-b border-slate-100 bg-white"><div className="flex justify-between items-center mb-4"><h3 className="font-bold text-slate-800 flex items-center gap-2"><MessageSquare size={18} className="text-indigo-600"/> Tường Lớp</h3><div className="flex gap-1"><button onClick={handleExportWord} className="text-blue-600 bg-blue-50 hover:bg-blue-100 p-2 rounded-lg transition-colors" title="Xuất file Word (Văn bản)"><FileText size={18}/></button><button onClick={handlePrintPDF} className="text-green-600 bg-green-50 hover:bg-green-100 p-2 rounded-lg transition-colors" title="In / Lưu PDF (Có ảnh)"><Printer size={18}/></button><button onClick={() => setShowActivityLog(false)} className="md:hidden text-slate-400"><X size={20}/></button></div></div><div className="flex gap-1 mb-3 bg-slate-100 p-1 rounded-xl">{['all', 'help', 'finished', 'raised'].map((t) => ( <button key={t} onClick={() => setFilterStatus(t as any)} className={`flex-1 text-[10px] py-1.5 rounded-lg font-bold uppercase transition-all ${filterStatus === t ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>{t === 'all' ? 'Tất cả' : t === 'help' ? 'Cần giúp' : t === 'finished' ? 'Đã xong' : 'Giơ tay'}</button> ))}</div><div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100"><button onClick={() => updateWallConfig({ isLocked: !wallConfig.isLocked })} className={`p-2 rounded-xl flex flex-col items-center gap-1 border-2 transition-all font-bold ${wallConfig.isLocked ? 'bg-red-50 border-red-200 text-red-600' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'}`}> {wallConfig.isLocked ? <Shield size={20} /> : <ShieldOff size={20} />} {wallConfig.isLocked ? 'Đã Khóa Chat' : 'Cho phép Chat'} </button><button onClick={() => updateWallConfig({ isPublic: !wallConfig.isPublic })} className={`p-2 rounded-xl flex flex-col items-center gap-1 border-2 transition-all font-bold ${wallConfig.isPublic ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'}`}>{wallConfig.isPublic ? <Globe size={20} /> : <Lock size={20} />}{wallConfig.isPublic ? 'Công khai' : 'Riêng tư'}</button></div><div className="mt-2 text-xs text-center text-slate-400"><button disabled={!wallConfig.isPublic} onClick={() => updateWallConfig({ showNames: !wallConfig.showNames })} className={`w-full py-1.5 rounded-lg border flex items-center justify-center gap-1 ${wallConfig.showNames ? 'bg-green-50 border-green-200 text-green-600' : 'bg-white border-slate-200'}`}> {wallConfig.showNames ? <Eye size={12}/> : <EyeOff size={12}/>} {wallConfig.showNames ? 'Hiện tên HS' : 'Ẩn tên HS'} </button></div></div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">{filteredMessages.length === 0 && <p className="text-center text-slate-400 text-sm font-medium py-10">Chưa có tin nhắn nào</p>}{filteredMessages.map((msg) => { const isTeacher = msg.role === UserRole.TEACHER; return ( <div key={msg.id} className={`bg-white p-4 rounded-2xl shadow-sm border border-slate-100 animate-in fade-in slide-in-from-bottom-2 ${isTeacher ? 'border-purple-200 bg-purple-50' : ''}`}> <div className="flex justify-between items-start mb-2"> <div className="flex items-center gap-2"> <span className={`font-bold text-sm ${isTeacher ? 'text-purple-700' : 'text-indigo-600'}`}> {isTeacher ? 'Thầy Châu' : wallConfig.showNames ? msg.senderName : 'Bạn giấu tên'} </span> {isTeacher && <Sparkles size={12} className="text-yellow-500 fill-yellow-500"/>} {!wallConfig.showNames && !isTeacher && <EyeOff size={12} className="text-slate-300"/>} </div> <span className="text-[10px] text-slate-400 font-medium">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> </div> {msg.text && <p className="text-slate-700 text-sm leading-relaxed">{msg.text}</p>} {msg.imageUrl && (<div className="mt-2 rounded-xl overflow-hidden border border-slate-200"><img src={msg.imageUrl} alt="upload" className="w-full h-auto object-cover" /></div>)} </div> ); })}<div ref={messagesEndRef} /></div>
+                <div className="p-3 border-t border-slate-100 bg-white">{selectedImage && (<div className="relative mb-2 inline-block"><img src={selectedImage} alt="Preview" className="h-16 w-auto rounded-xl border-2 border-slate-200 shadow-sm" /><button onClick={() => setSelectedImage(null)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600"><X size={12} /></button></div>)}<form onSubmit={handleSend} className="flex gap-2"> <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 text-slate-400 bg-slate-100 rounded-2xl hover:bg-purple-50 hover:text-purple-600 transition-colors"><ImageIcon size={24} /></button> <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageSelect} /> <input type="text" value={messageText} onChange={(e) => setMessageText(e.target.value)} placeholder="Nhắn cả lớp..." className="flex-1 bg-slate-100 px-4 rounded-2xl outline-none focus:ring-2 focus:ring-purple-500/50 font-medium text-slate-700 transition-all focus:bg-white border border-transparent focus:border-purple-200" /> <button type="submit" disabled={!messageText.trim() && !selectedImage} className="bg-purple-600 text-white p-3 rounded-2xl disabled:opacity-50 hover:bg-purple-700 transition-all shadow-lg shadow-purple-200 active:scale-95"><Send size={24} /></button> </form></div>
             </div>
           )}
       </div>
+
+      {/* POPUP HƯỚNG DẪN KẾT NỐI (MỚI) */}
+      {showConnectionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+            <div className="relative w-full max-w-[1000px] aspect-video bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row animate-in zoom-in-95 duration-300 border border-white/20">
+                {/* Nút đóng */}
+                <button onClick={() => setShowConnectionModal(false)} className="absolute top-4 right-4 bg-white/20 hover:bg-white/40 p-2 rounded-full text-slate-500 hover:text-slate-800 transition-all z-10"><X size={32} /></button>
+
+                {/* Phần QR Code bên trái */}
+                <div className="w-full md:w-1/2 bg-gradient-to-br from-indigo-600 to-purple-700 flex flex-col items-center justify-center p-10 text-white relative overflow-hidden">
+                    {/* Họa tiết trang trí */}
+                    <div className="absolute -top-20 -left-20 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
+                    <div className="absolute bottom-0 right-0 w-64 h-64 bg-purple-500/30 rounded-full blur-3xl"></div>
+                    
+                    <div className="bg-white p-6 rounded-3xl shadow-2xl transform hover:scale-105 transition-transform duration-300">
+                        <QRCodeSVG value={joinUrl} size={280} level="H" />
+                    </div>
+                    <p className="mt-8 text-indigo-100 font-medium text-lg flex items-center gap-2">
+                        <ScanIcon /> Quét mã để vào lớp nhanh
+                    </p>
+                </div>
+
+                {/* Phần thông tin bên phải */}
+                <div className="w-full md:w-1/2 p-12 flex flex-col justify-center bg-slate-50 text-center relative">
+                    <h2 className="text-3xl font-extrabold text-slate-800 mb-2">Tham gia lớp học</h2>
+                    <p className="text-slate-500 mb-8 font-medium">Truy cập vào địa chỉ bên dưới và nhập mã:</p>
+
+                    <div className="bg-white border-2 border-slate-200 rounded-3xl p-8 shadow-sm mb-8">
+                        <p className="text-sm text-slate-400 font-bold uppercase tracking-wider mb-2">Mã Lớp Học</p>
+                        <div className="text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 tracking-tight">
+                            {session.roomId}
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                        <div className="flex items-center gap-2 bg-white border border-slate-200 p-3 rounded-xl">
+                            <Globe size={20} className="text-slate-400 ml-2" />
+                            <input type="text" readOnly value={joinUrl} className="flex-1 bg-transparent outline-none text-slate-600 font-bold text-sm truncate" />
+                            <button onClick={() => navigator.clipboard.writeText(joinUrl)} className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 p-2 rounded-lg transition-colors font-bold text-xs flex items-center gap-1">
+                                <Copy size={14} /> COPY
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
+
       {showAiModal && (<div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-4"><div className="bg-white w-full max-w-xl rounded-3xl shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200"><div className="p-5 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-purple-600 to-indigo-600 rounded-t-3xl text-white"> <h2 className="font-bold text-lg flex items-center gap-2"><Sparkles size={22}/> Trợ Lý Sư Phạm</h2> <button onClick={() => setShowAiModal(false)} className="hover:bg-white/20 p-2 rounded-full transition-colors"><X size={20}/></button> </div><div className="p-6 flex-1 overflow-y-auto space-y-4 bg-slate-50"> {!aiResponse && !isAiLoading && ( <div className="text-center text-slate-500 py-10"> <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"><Sparkles className="text-purple-600" size={32} /></div> <p className="font-medium">Thầy/cô cần hỗ trợ gì ngay lúc này?</p> <div className="mt-6 flex flex-wrap gap-2 justify-center"> <button onClick={() => setAiPrompt("Gợi ý hoạt động cho nhóm làm xong rồi")} className="text-xs font-bold bg-white border border-slate-200 hover:border-purple-400 text-slate-600 hover:text-purple-600 px-4 py-2 rounded-full transition-all shadow-sm">💡 Gợi ý cho nhóm xong</button> <button onClick={() => setAiPrompt("Viết lời động viên cho bạn đang cần giúp")} className="text-xs font-bold bg-white border border-slate-200 hover:border-purple-400 text-slate-600 hover:text-purple-600 px-4 py-2 rounded-full transition-all shadow-sm">❤️ Động viên học sinh</button> </div> </div> )} {aiResponse && ( <div className="bg-white p-5 rounded-2xl text-slate-700 text-sm leading-relaxed border border-purple-100 shadow-sm"><p style={{whiteSpace: 'pre-line'}}>{aiResponse}</p></div> )} {isAiLoading && ( <div className="flex flex-col items-center justify-center py-10 gap-3"><Loader2 className="animate-spin text-purple-600 w-8 h-8" /><span className="text-xs font-bold text-purple-600 uppercase tracking-wider">AI đang suy nghĩ...</span></div> )} </div><form onSubmit={handleAskAI} className="p-4 border-t border-slate-100 bg-white rounded-b-3xl"> <div className="flex gap-2 relative"> <input type="text" value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} placeholder="Nhập câu hỏi..." className="flex-1 px-5 py-3 rounded-2xl border-2 border-slate-200 bg-slate-50 focus:bg-white focus:border-purple-500 focus:ring-4 focus:ring-purple-100 outline-none transition-all font-medium" /> <button type="submit" disabled={isAiLoading || !aiPrompt.trim()} className="bg-purple-600 text-white p-3 rounded-2xl hover:bg-purple-700 disabled:opacity-50 transition-all shadow-lg shadow-purple-200 active:scale-95"><Send size={20} /></button> </div> </form></div></div> )}
     </div>
   );
 };
+
+// Helper Icon
+function ScanIcon() {
+    return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></svg>
+}

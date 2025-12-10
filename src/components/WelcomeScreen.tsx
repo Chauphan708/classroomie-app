@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserRole } from '../types';
 import { User, GraduationCap, ArrowRight, Lock, KeyRound, Hash } from 'lucide-react';
 
@@ -13,6 +13,16 @@ export const WelcomeScreen: React.FC<Props> = ({ onJoin }) => {
   const [role, setRole] = useState<UserRole | null>(null);
   const [group, setGroup] = useState('1');
   const [error, setError] = useState('');
+
+  // Tự động lấy mã phòng từ URL (Ví dụ: classroomie.app/?room=5A2)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const roomParam = params.get('room');
+    if (roomParam) {
+      setRoomId(roomParam.toUpperCase());
+      setRole(UserRole.STUDENT); // Tự động chọn vai trò HS luôn cho tiện
+    }
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +62,6 @@ export const WelcomeScreen: React.FC<Props> = ({ onJoin }) => {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-5 animate-in slide-in-from-right duration-300 relative z-10">
-            {/* Ô NHẬP MÃ LỚP */}
             <div>
                 <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide flex items-center gap-2">
                   <Hash size={16} className="text-indigo-500"/> Mã Lớp Học

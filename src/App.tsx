@@ -13,11 +13,9 @@ export default function App() {
 
   const handleJoin = (name: string, role: UserRole, roomId: string, group?: string) => {
     const id = generateId();
-    // Lưu roomId vào session để dùng về sau
     const newSession = { id, name, role, roomId }; 
     setSession(newSession);
     
-    // Gọi hàm connectToRoom với đầy đủ 2 tham số: user + roomId
     store.connectToRoom({ 
       id, 
       name, 
@@ -37,8 +35,9 @@ export default function App() {
     return <WelcomeScreen onJoin={handleJoin} />;
   }
 
+  // CẬP NHẬT: Truyền thêm session vào TeacherView
   if (session.role === UserRole.TEACHER) {
-    return <TeacherView store={store} onLogout={handleLogout} />;
+    return <TeacherView session={session} store={store} onLogout={handleLogout} />;
   }
 
   return <StudentView session={session} store={store} onLogout={handleLogout} />;
